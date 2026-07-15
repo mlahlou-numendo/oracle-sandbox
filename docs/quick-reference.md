@@ -23,6 +23,12 @@ sandbox start apex             # Start ORDS
 sandbox stop apex              # Stop ORDS
 sandbox restart apex           # Restart ORDS
 
+# Sample Schemas
+sandbox install schema --name hr   # Install HR (Human Resources) schema
+sandbox install schema --name oe   # Install OE (Order Entry) schema
+sandbox install schema --name pm   # Install PM (Product Media) schema
+sandbox install schema --name sh   # Install SH (Sales History) schema
+
 # Logs
 sandbox logs apex              # APEX install log
 sandbox logs ords              # ORDS runtime log

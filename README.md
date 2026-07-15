@@ -54,6 +54,7 @@ Designed to facilitate learning through practical experience, this setup allows 
 - Oracle Database 26ai Free, preconfigured for local development
 - APEX 26.1.0 + ORDS 26.1.2 fully integrated and ready to use
 - SQLcl & SQL*Plus included for scripting, labs, and automation
+- Oracle Sample Schemas (HR, OE, PM, SH) available for instant installation
 - Clean Docker Compose setup (Database + Management Server)
 - Compatible with Linux, macOS (Intel/ARM), and Windows WSL2
 - Simple environment variables and port mapping for easy configuration
@@ -692,6 +693,10 @@ All scripts are organized in a structured directory layout for better maintainab
 | `sandbox run monitor` | Monitoring script runner | Execute database monitoring scripts |
 | `sandbox healthcheck` | Health diagnostics | Run health check |
 | `sandbox install apex` | APEX & ORDS installer | Install APEX and ORDS |
+| `sandbox install schema --name hr` | HR schema installer | Install HR (Human Resources) sample schema |
+| `sandbox install schema --name oe` | OE schema installer | Install OE (Order Entry) sample schema |
+| `sandbox install schema --name pm` | PM schema installer | Install PM (Product Media) sample schema |
+| `sandbox install schema --name sh` | SH schema installer | Install SH (Sales History) sample schema |
 | `sandbox start apex` | ORDS service | Start ORDS after APEX installation |
 | `sandbox stop apex` | ORDS service | Stop ORDS after APEX installation |
 
