@@ -18,7 +18,7 @@ _sandbox_completion() {
     local start_resources="apex mcp"
     local stop_resources="apex mcp"
     local restart_resources="apex mcp"
-    local install_resources="apex"
+    local install_resources="apex schema"
     local uninstall_resources="apex"
     local download_resources="apex"
     local conn_resources="list add delete test rename"

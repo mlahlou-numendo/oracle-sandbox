@@ -174,9 +174,12 @@ case "$ACTION" in
         echo ""
         echo -e "  ${YELLOW}Resources:${NC}"
         echo -e "    ${CYAN}apex${NC}      Install Oracle APEX + ORDS"
+        echo -e "    ${CYAN}schema${NC}    Install Oracle sample schemas (HR, OE, PM, SH)"
         echo ""
         echo -e "  ${YELLOW}Examples:${NC}"
         echo -e "    sandbox install apex"
+        echo -e "    sandbox install schema --name hr"
+        echo -e "    sandbox install schema --name oe"
         echo ""
         ;;
     uninstall)
