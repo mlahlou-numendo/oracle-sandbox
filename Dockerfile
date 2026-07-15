@@ -70,7 +70,7 @@ COPY ./src/builder/scripts/oracle/sqlplus/*.sh           ${SANDBOX_ORACLE}/sqlpl
 RUN find ${SANDBOX_APP} -type f -name '*.sh' -exec chmod +x {} \;
 
 WORKDIR ${SANDBOX_APP}
-RUN mkdir -p /opt/oracle
+RUN mkdir -p /opt/oracle /opt/oracle/sample-schemas && chmod -R 777 /opt/oracle/sample-schemas
 
 # Install Oracle components (Instant Client + SQLcl)
 ENV TERM=xterm-256color
