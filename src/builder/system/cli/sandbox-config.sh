@@ -10,7 +10,7 @@ VALID_SQLCL_USERS="sys system sandbox sandbox_ai demasy demasy_ai"
 # Maps actions → valid resources (replaces inline resources_for() function)
 declare -A SANDBOX_RESOURCES=(
     [download]="apex"
-    [install]="apex"
+    [install]="apex schema"
     [uninstall]="apex"
     [start]="apex mcp"
     [stop]="apex mcp"
@@ -144,6 +144,7 @@ declare -A SANDBOX_HELP_SHORT=(
 
     # ── install / uninstall / download ──
     [install:apex]="Install Oracle APEX + ORDS"
+    [install:schema]="Install Oracle sample schemas (HR, OE, PM, SH)"
     [uninstall:apex]="Uninstall Oracle APEX + ORDS"
     [download:apex]="Download Oracle APEX + ORDS packages"
 

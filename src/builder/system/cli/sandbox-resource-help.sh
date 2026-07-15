@@ -208,6 +208,21 @@ case "${ACTION}/${RESOURCE}" in
         _rh_e "sandbox ${ACTION} ${RESOURCE}"
         _rh_end ;;
 
+    install/schema)
+        _rh_print "--name <schema>"
+        _rh_params
+        _rh_p "--name, -n" "<schema>" "Required. Schema name: hr|oe|pm|sh"
+        _rh_note "${CYAN}hr${NC}  - Human Resources (7 tables, ~107 employees)"
+        _rh_note "${CYAN}oe${NC}  - Order Entry (12 tables, requires HR)"
+        _rh_note "${CYAN}pm${NC}  - Product Media (2 LOB tables)"
+        _rh_note "${CYAN}sh${NC}  - Sales History (10+ tables, star schema)"
+        _rh_examples
+        _rh_e "sandbox install schema --name hr"
+        _rh_e "sandbox install schema --name oe"
+        _rh_e "sandbox install schema --name pm"
+        _rh_e "sandbox install schema --name sh"
+        _rh_end ;;
+
     install/oracle|install/client|install/sqlcl|install/sqlplus)
         _rh_print
         _rh_examples
