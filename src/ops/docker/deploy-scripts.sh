@@ -104,10 +104,16 @@ get_symlink_name() {
         create-db-link.sh)          echo "create-db-link" ;;
         healthcheck.sh)             echo "healthcheck" ;;
         download-apex.sh)           echo "download-apex" ;;
+        download-sample-schemas.sh) echo "download-sample-schemas" ;;
         install-all.sh)             echo "install-all" ;;
         install-client.sh)          echo "install-client" ;;
         install-sqlcl.sh)           echo "install-sqlcl" ;;
         install-sqlplus.sh)         echo "install-sqlplus" ;;
+        install-sample-schema.sh)   echo "install-sample-schema" ;;
+        install-hr-schema.sh)       echo "install-hr-schema" ;;
+        install-oe-schema.sh)       echo "install-oe-schema" ;;
+        install-pm-schema.sh)       echo "install-pm-schema" ;;
+        install-sh-schema.sh)       echo "install-sh-schema" ;;
         download.sh)                echo "download-oracle-components" ;;
         start-mcp-with-saved-connection.sh) echo "start-mcp" ;;
         sandbox.sh)                         echo "sandbox" ;;
