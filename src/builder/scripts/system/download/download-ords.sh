@@ -42,10 +42,12 @@ log_info "Downloading Oracle ORDS from oracle.com"
 log_warn "By downloading, you accept Oracle's license terms"
 echo ""
 
-log_step "Downloading ORDS..."
-log_info "Downloading from: oracle.com"
+ORDS_DOWNLOAD_URL="${SRC_ORACLE_ORDS:-https://download.oracle.com/otn_software/java/ords/ords-latest.zip}"
 
-curl -L -o /tmp/ords.zip "https://download.oracle.com/otn_software/java/ords/ords-latest.zip"
+log_step "Downloading ORDS..."
+log_info "Downloading from: ${ORDS_DOWNLOAD_URL}"
+
+curl -L -o /tmp/ords.zip "${ORDS_DOWNLOAD_URL}"
 
 if [ $? -eq 0 ]; then
     log_step "Extracting ORDS..."

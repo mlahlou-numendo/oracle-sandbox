@@ -5,15 +5,16 @@
 
 echo "🛑 Stopping Oracle APEX/ORDS..."
 
-# Check if ORDS is running
-if ! pidof -x '/opt/oracle/ords/bin/ords' > /dev/null 2>&1; then
+# The running process is "java -jar .../ords.war ..." (the ords wrapper execs into
+# java), so it never matches a pidof -x lookup against the wrapper script path.
+if ! pgrep -f 'ords\.war' > /dev/null 2>&1; then
     echo "ℹ️  ORDS is not currently running"
     exit 0
 fi
 
 # Kill ORDS process
 echo "Terminating ORDS process..."
-ORDS_PID=$(pidof -x '/opt/oracle/ords/bin/ords' | awk '{print $1}')
+ORDS_PID=$(pgrep -f 'ords\.war' | head -1)
 if [ -n "$ORDS_PID" ]; then
     kill $ORDS_PID
     sleep 2

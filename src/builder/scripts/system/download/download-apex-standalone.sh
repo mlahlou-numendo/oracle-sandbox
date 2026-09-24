@@ -44,10 +44,12 @@ log_warn "By downloading, you accept Oracle's license terms"
 log_warn "This is a large file (~250MB), it may take several minutes"
 echo ""
 
-log_step "Downloading APEX..."
-log_info "Downloading from: oracle.com"
+APEX_DOWNLOAD_URL="${SRC_ORACLE_APEX:-https://download.oracle.com/otn_software/apex/apex-latest.zip}"
 
-curl -L -o /tmp/apex.zip "https://download.oracle.com/otn_software/apex/apex-latest.zip"
+log_step "Downloading APEX..."
+log_info "Downloading from: ${APEX_DOWNLOAD_URL}"
+
+curl -L -o /tmp/apex.zip "${APEX_DOWNLOAD_URL}"
 
 if [ $? -eq 0 ]; then
     log_step "Extracting APEX..."

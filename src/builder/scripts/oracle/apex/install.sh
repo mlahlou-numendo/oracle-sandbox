@@ -106,14 +106,28 @@ mkdir -p /tmp/apex-install
 ################################################################################
 log_info "Step 2: Testing database connection..."
 
-if ! sql system/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} << EOF > /dev/null 2>&1
-SELECT 1 FROM DUAL;
+# Retry rather than fail on the first attempt: on `docker compose up` this runs
+# while the DB container is still opening FREEPDB1 and resetting passwords.
+# The concatenated marker can only appear in real query output.
+DB_CONNECT_TIMEOUT="${SANDBOX_APEX_DB_CONNECT_TIMEOUT:-300}"
+DB_CONNECT_ELAPSED=0
+until DB_CONNECT_OUTPUT=$(sql -S system/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} 2>&1 << EOF
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SELECT 'DB_' || 'READY' FROM DUAL;
 EXIT
 EOF
-then
-    log_error "Cannot connect to database at ${DB_HOST}:${DB_PORT}/${DB_SERVICE}"
-    exit 1
-fi
+) && grep -q '^DB_READY$' <<< "${DB_CONNECT_OUTPUT}"; do
+    if [ "${DB_CONNECT_ELAPSED}" -ge "${DB_CONNECT_TIMEOUT}" ]; then
+        log_error "Cannot connect to database at ${DB_HOST}:${DB_PORT}/${DB_SERVICE} after ${DB_CONNECT_TIMEOUT}s"
+        echo "${DB_CONNECT_OUTPUT}" | grep -m3 -E 'ORA-|Error'
+        exit 1
+    fi
+    log_info "Database not reachable yet, retrying... (${DB_CONNECT_ELAPSED}/${DB_CONNECT_TIMEOUT}s)"
+    sleep 5
+    DB_CONNECT_ELAPSED=$((DB_CONNECT_ELAPSED + 5))
+done
 
 log_success "Database connection successful"
 
@@ -245,9 +259,13 @@ EOSQL
 fi
 
 if [ "$SKIP_APEX_INSTALL" = false ]; then
-    # FIX: Create SQL file with absolute path and run from APEX directory
+    # APEX_HOME is root-owned (read-only APEX distribution; container runs as
+    # non-root "sandbox"), so the generated driver script must live in /tmp —
+    # the cd into APEX_HOME below is still required for apexins.sql's own
+    # internal relative-path includes to resolve.
+    APEX_INSTALL_SQL="/tmp/install_apex.sql"
     log_info "Creating APEX installation SQL script..."
-cat > "${APEX_HOME}/install_apex.sql" << SQL_EOF
+cat > "${APEX_INSTALL_SQL}" << SQL_EOF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 @${APEX_HOME}/apexins.sql ${APEX_TABLE_SPACE} ${APEX_TABLE_SPACE_FILES} TEMP /i/
 EXIT
@@ -261,7 +279,7 @@ log_info "Running APEX installation (this takes 3-5 minutes)..."
 log_info "Monitor progress in another terminal: docker exec sandbox-oracle-server tail -f ${APEX_INSTALL_LOG}"
 
 # Run installation from APEX directory (CRITICAL: cd is required)
-(cd "${APEX_HOME}" && sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba @"${APEX_HOME}/install_apex.sql") > "${APEX_INSTALL_LOG}" 2>&1 &
+(cd "${APEX_HOME}" && sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba @"${APEX_INSTALL_SQL}") > "${APEX_INSTALL_LOG}" 2>&1 &
 APEX_PID=$!
 
 # Show progress dots with elapsed time while installation runs
@@ -469,6 +487,44 @@ EXIT
 EOSQL
 
 log_success "Workspace ${WORKSPACE_NAME:-SANDBOX} created with admin ${WORKSPACE_ADMIN:-demasylabs}"
+
+################################################################################
+# STEP 5D: Activate workspace (ACCOUNT_STATUS = ASSIGNED)
+################################################################################
+# On a fresh instance, the first ADD_WORKSPACE leaves the workspace in
+# ACCOUNT_STATUS 'AVAILABLE'. App Builder sign-in then rejects every user of it
+# with AUTH_UNKNOWN_WORKSPACE (authentication_result 8 in
+# WWV_FLOW_USER_ACCESS_LOG1$/2$), shown as "Invalid Login Credentials" even
+# though the password is valid. ENABLE_WORKSPACE fixes it, but is a no-op when
+# called in the same block as that first ADD_WORKSPACE, so it runs in its own
+# session here, after the workspace block has committed.
+log_info "Step 5D: Activating workspace ${WORKSPACE_NAME}..."
+
+WS_STATUS=$(sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL 2>&1 | grep -o 'WS_STATUS=[A-Z]*'
+ALTER SESSION SET CONTAINER=FREEPDB1;
+SET SERVEROUTPUT ON FEEDBACK OFF
+DECLARE
+    v_apex_schema VARCHAR2(128);
+    v_status      VARCHAR2(30);
+BEGIN
+    APEX_INSTANCE_ADMIN.ENABLE_WORKSPACE(p_workspace => '${WORKSPACE_NAME}');
+    COMMIT;
+    SELECT schema INTO v_apex_schema FROM dba_registry WHERE comp_id = 'APEX';
+    EXECUTE IMMEDIATE 'SELECT account_status FROM ' || v_apex_schema ||
+        '.wwv_flow_companies WHERE short_name = :1' INTO v_status USING UPPER('${WORKSPACE_NAME}');
+    DBMS_OUTPUT.PUT_LINE('WS_STATUS=' || v_status);
+END;
+/
+EXIT
+EOSQL
+) || true
+
+if [ "${WS_STATUS}" = "WS_STATUS=ASSIGNED" ]; then
+    log_success "Workspace ${WORKSPACE_NAME} is active (ASSIGNED)"
+else
+    log_error "Workspace ${WORKSPACE_NAME} is not active (${WS_STATUS:-status unknown}) — App Builder login will fail"
+    exit 1
+fi
 
 ################################################################################
 # STEP 6: Configure APEX REST

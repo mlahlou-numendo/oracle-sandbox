@@ -15,6 +15,19 @@ source /usr/sandbox/app/system/utils/logging.sh
 source /usr/sandbox/app/system/utils/banner.sh
 source /usr/sandbox/app/system/utils/commands.sh
 
+# True only when a real query round-trips. The marker is built by concatenation
+# so it can only appear in query output — SQLcl's connection-failure text
+# (ORA-12541, port 1521, ...) contains digits, so grepping for "1" false-passes.
+db_is_ready() {
+    sql -S "${SANDBOX_DB_USER}/\"${SANDBOX_DB_PASS}\"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE}" <<EOF 2>/dev/null | grep -q '^DB_READY$'
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SELECT 'DB_' || 'READY' FROM DUAL;
+EXIT;
+EOF
+}
+
 print_demasy_banner "Oracle Sandbox Startup"
 
 echo ""
@@ -113,19 +126,12 @@ if [ "$INSTALL_APEX" = "true" ]; then
         # Wait for database to be ready if configured
         if [ "${SANDBOX_STARTUP_WAIT_FOR_DB:-true}" = "true" ]; then
             log_info "Waiting for database to be ready..."
-            WAIT_TIMEOUT=${SANDBOX_STARTUP_DB_WAIT_TIMEOUT:-120}
+            WAIT_TIMEOUT=${SANDBOX_STARTUP_DB_WAIT_TIMEOUT:-300}
             WAIT_INTERVAL=${SANDBOX_STARTUP_DB_WAIT_INTERVAL:-5}
             WAIT_ELAPSED=0
-            
+
             while [ $WAIT_ELAPSED -lt $WAIT_TIMEOUT ]; do
-                if sql -S ${SANDBOX_DB_USER}/\"${SANDBOX_DB_PASS}\"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE} <<EOF 2>/dev/null | grep -q "1"
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SELECT 1 FROM DUAL;
-EXIT;
-EOF
-                then
+                if db_is_ready; then
                     log_success "Database is ready"
                     echo ""
                     break
@@ -142,7 +148,37 @@ EOF
                 echo ""
             fi
         fi
-        
+
+        # Auto-install APEX in the background if enabled. install-apex checks
+        # dba_registry and skips cleanly if already installed, so it's safe to
+        # call unconditionally here rather than re-implementing that check.
+        if [ "${SANDBOX_AUTO_INSTALL_APEX_ON_STARTUP:-false}" = "true" ]; then
+            APEX_AUTO_INSTALL_LOG="${SANDBOX_APEX_INSTALL_LOG:-/tmp/apex_install.log}"
+            APEX_AUTO_INSTALL_TIMEOUT="${SANDBOX_APEX_INSTALL_TIMEOUT:-1800}"
+
+            (
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Auto-install starting (timeout: ${APEX_AUTO_INSTALL_TIMEOUT}s)" >> "${APEX_AUTO_INSTALL_LOG}"
+                if timeout "${APEX_AUTO_INSTALL_TIMEOUT}" install-apex >> "${APEX_AUTO_INSTALL_LOG}" 2>&1; then
+                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [OK] Auto APEX install complete" >> "${APEX_AUTO_INSTALL_LOG}"
+                else
+                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] Auto APEX install failed or timed out — run install-apex manually" >> "${APEX_AUTO_INSTALL_LOG}"
+                fi
+            ) &
+
+            log_info "Auto-installing APEX in the background (SANDBOX_AUTO_INSTALL_APEX_ON_STARTUP=true)"
+            log_info "Monitor: tail -f ${APEX_AUTO_INSTALL_LOG}"
+            echo ""
+
+            if [ "${SANDBOX_SHOW_APEX_INSTALL_LOGS:-false}" = "true" ]; then
+                touch "${APEX_AUTO_INSTALL_LOG}"
+                tail -f "${APEX_AUTO_INSTALL_LOG}" &
+            fi
+        else
+            log_info "APEX auto-install disabled (SANDBOX_AUTO_INSTALL_APEX_ON_STARTUP=${SANDBOX_AUTO_INSTALL_APEX_ON_STARTUP:-false})"
+            log_info "Run manually: ${CYAN}install-apex${RESET}"
+            echo ""
+        fi
+
     else
         log_warn "Cannot check APEX installation (database not accessible)"
         log_info "Once database is ready, run: ${CYAN}install-apex${RESET}"
@@ -168,14 +204,7 @@ if [[ -n "$SANDBOX_DB_HOST" && -n "$SANDBOX_DB_PORT" && -n "$SANDBOX_DB_SERVICE"
 
         # Wait for database to be ready
         while [ "$WAIT_ELAPSED" -lt "$WAIT_TIMEOUT" ]; do
-            if sql -S "${SANDBOX_DB_USER}/\"${SANDBOX_DB_PASS}\"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE}" <<EOF 2>/dev/null | grep -q "1"
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SELECT 1 FROM DUAL;
-EXIT;
-EOF
-            then
+            if db_is_ready; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Database is ready" >> "$AUTO_USER_LOG"
                 break
             fi
