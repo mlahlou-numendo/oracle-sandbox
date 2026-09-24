@@ -80,7 +80,7 @@ check_database_health() {
         echo -e " - Database Port: ${GREEN}✓ REACHABLE${NC}"
         
         # Test actual database connection using SQLcl
-        local db_test=$(timeout 10 bash -c "echo 'SELECT 1 FROM DUAL; EXIT;' | sql -S system/${SANDBOX_DB_PASS}@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE}" 2>/dev/null | grep -c "1" || echo "0")
+        local db_test=$(timeout 10 bash -c "echo 'SELECT 1 FROM DUAL; EXIT;' | sql -S system/\"${SANDBOX_DB_PASS}\"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE}" 2>/dev/null | grep -c "1" || echo "0")
         
         if [ "$db_test" -gt 0 ]; then
             echo -e " - Database Connectivity: ${GREEN}✓ OK${NC}"

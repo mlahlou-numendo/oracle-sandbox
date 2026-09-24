@@ -62,7 +62,13 @@ RUN mkdir -p /opt/oracle
 
 # Install Oracle components (Instant Client + SQLcl)
 ENV TERM=xterm-256color
-RUN /usr/sandbox/app/system/build/builder-startup.sh
+RUN /usr/sandbox/app/system/install/install-client.sh
+RUN /usr/sandbox/app/system/install/install-sqlcl.sh
+RUN ARCH=$(uname -m) && if [ "$ARCH" = "x86_64" ]; then \
+      /usr/sandbox/app/system/install/install-sqlplus.sh; \
+    else \
+      echo "Skipping SQL*Plus install on $ARCH"; \
+    fi
 
 # Fix terminal for interactive docker exec sessions (suppresses "(arg: N)" noise
 # caused by macOS terminal sending bracketed-paste sequences on attach)
@@ -121,6 +127,10 @@ ENV INSTALL_APEX=${INSTALL_APEX}
 COPY --from=sandbox-builder package*.json ./
 COPY --from=sandbox-builder /usr/sandbox/app /usr/sandbox/app
 COPY --from=sandbox-builder /opt/oracle /opt/oracle
+
+# Oracle binaries/jars are unzipped as root under a restrictive umask (mode 640),
+# leaving them unreadable by the non-root sandbox user this image runs as
+RUN chmod -R go+rX /opt/oracle
 
 RUN npm install oracledb --build-from-source --unsafe-perm
 

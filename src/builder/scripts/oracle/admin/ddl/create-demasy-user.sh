@@ -79,7 +79,7 @@ while [ $CONNECTION_ATTEMPTS -lt $MAX_ATTEMPTS ]; do
     CONNECTION_ATTEMPTS=$((CONNECTION_ATTEMPTS + 1))
     log_step "Connection attempt $CONNECTION_ATTEMPTS of $MAX_ATTEMPTS..."
     
-    if CONNECTION_TEST=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
+    if CONNECTION_TEST=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT 'Connected to ' || SYS_CONTEXT('USERENV', 'CON_NAME') AS connection_info FROM DUAL;
@@ -113,7 +113,7 @@ done
 log_section "Step 2: Checking PDB Status"
 log_step "Checking if $PDB_NAME already exists..."
 
-PDB_EXISTS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+PDB_EXISTS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -128,7 +128,7 @@ if [ "$PDB_EXISTS" = "1" ]; then
     log_warn "PDB $PDB_NAME already exists"
     
     # Check PDB status
-    PDB_STATUS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    PDB_STATUS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -158,10 +158,10 @@ if [ "$SKIP_PDB_CREATION" = false ]; then
     log_section "Step 3: Creating Pluggable Database"
     log_step "Creating PDB $PDB_NAME..."
     
-    if sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    if sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 -- Create the pluggable database
 CREATE PLUGGABLE DATABASE ${PDB_NAME}
-ADMIN USER pdb_admin IDENTIFIED BY ${DB_PASSWORD}
+ADMIN USER pdb_admin IDENTIFIED BY "${DB_PASSWORD}"
 FILE_NAME_CONVERT = ('/opt/oracle/oradata/FREE/pdbseed/', '/opt/oracle/oradata/FREE/demasylabs_pdb/');
 
 -- Verify creation
@@ -187,7 +187,7 @@ if [ "$NEED_TO_OPEN_PDB" = true ]; then
     log_step "Opening PDB $PDB_NAME..."
     
     # Use a more robust approach for opening PDB
-    PDB_OPEN_OUTPUT=$(sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF 2>&1
+    PDB_OPEN_OUTPUT=$(sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF 2>&1
 -- Check current status first
 SELECT 'Current PDB status: ' || open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
 
@@ -209,7 +209,7 @@ EOF
     else
         log_warn "PDB opening completed with messages: $PDB_OPEN_OUTPUT"
         # Verify current status
-        CURRENT_STATUS=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+        CURRENT_STATUS=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -233,7 +233,7 @@ fi
 log_section "Step 5: Creating Common User"
 log_step "Checking if common user $COMMON_USER exists..."
 
-COMMON_USER_EXISTS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+COMMON_USER_EXISTS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_users WHERE username = '$(echo $COMMON_USER | tr '[:lower:]' '[:upper:]')';
@@ -249,9 +249,9 @@ if [ "$COMMON_USER_EXISTS" = "1" ]; then
 else
     log_step "Creating common user $COMMON_USER..."
     
-    if sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    if sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 -- Create common user
-CREATE USER ${COMMON_USER} IDENTIFIED BY ${DB_PASSWORD};
+CREATE USER ${COMMON_USER} IDENTIFIED BY "${DB_PASSWORD}";
 
 -- Note: SYSDBA cannot be granted locally in Oracle 26ai CDB root
 -- This is expected behavior in multitenant architecture
@@ -274,7 +274,7 @@ log_section "Step 6: Creating Local User in PDB"
 log_step "Checking if local user $DEMASY_USER exists in PDB $PDB_NAME..."
 
 # Check if local user exists in PDB
-LOCAL_USER_EXISTS_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+LOCAL_USER_EXISTS_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 -- Switch to PDB
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 
@@ -293,12 +293,12 @@ if [ "$LOCAL_USER_EXISTS" = "1" ]; then
 else
     log_step "Creating local user $DEMASY_USER in PDB $PDB_NAME with comprehensive privileges..."
     
-    if sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+    if sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 -- Switch to PDB
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 
 -- Create local user with comprehensive development privileges
-CREATE USER ${DEMASY_USER} IDENTIFIED BY ${DB_PASSWORD};
+CREATE USER ${DEMASY_USER} IDENTIFIED BY "${DB_PASSWORD}";
 
 -- Grant basic connectivity and resource privileges
 GRANT CONNECT TO ${DEMASY_USER};
@@ -682,7 +682,7 @@ fi
 
 # Re-check local user existence after creation
 log_step "Re-verifying local user creation..."
-LOCAL_USER_EXISTS_FINAL=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+LOCAL_USER_EXISTS_FINAL=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -706,7 +706,7 @@ log_step "Verifying all operations completed successfully..."
 
 # Verify PDB status
 log_step "Checking PDB status..."
-PDB_INFO=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+PDB_INFO=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT name || '|' || open_mode || '|' || restricted FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -722,7 +722,7 @@ fi
 
 # Verify common user
 log_step "Checking common user status..."
-COMMON_USER_STATUS=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+COMMON_USER_STATUS=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT username || '|' || account_status || '|' || created FROM dba_users WHERE username = '$(echo $COMMON_USER | tr '[:lower:]' '[:upper:]')';
@@ -739,7 +739,7 @@ fi
 # Verify local user privileges in PDB
 log_step "Checking local user privileges in PDB..."
 if [ "$LOCAL_USER_EXISTS" = "1" ]; then
-    PRIVILEGE_COUNT_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+    PRIVILEGE_COUNT_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -748,7 +748,7 @@ EXIT
 EOF
     )
     
-    ROLE_COUNT_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+    ROLE_COUNT_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -772,7 +772,7 @@ fi
 # Test connection to PDB as demasy user
 log_step "Testing connection and basic functionality as demasy user..."
 if [ "$LOCAL_USER_EXISTS" = "1" ]; then
-    TEST_OUTPUT=$(sql -s ${DEMASY_USER}/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << 'EOF' 2>&1
+    TEST_OUTPUT=$(sql -s ${DEMASY_USER}/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << 'EOF' 2>&1
 SET PAGESIZE 0
 SET FEEDBACK OFF
 -- Test basic operations
@@ -792,7 +792,7 @@ EOF
     else
         log_warn "⚠ Connection test had issues: $TEST_OUTPUT"
         # Try a simpler connection test
-        SIMPLE_TEST=$(sql -s ${DEMASY_USER}/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << 'EOF' 2>&1
+        SIMPLE_TEST=$(sql -s ${DEMASY_USER}/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << 'EOF' 2>&1
 SELECT 'SIMPLE_SUCCESS' FROM DUAL;
 EXIT
 EOF
@@ -828,7 +828,7 @@ echo ""
 echo "🔗 Connection Examples:"
 echo "   • SQLcl: sql ${DEMASY_USER}/password@//${DB_HOST}:${DB_PORT}/${PDB_NAME}"
 echo "   • SQL*Plus: sqlplus ${DEMASY_USER}/password@${DB_HOST}:${DB_PORT}/${PDB_NAME}"
-echo "   • From container: sql ${DEMASY_USER}/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME}"
+echo "   • From container: sql ${DEMASY_USER}/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME}"
 echo ""
 echo "💡 Development Notes:"
 echo "   • SYSDBA privileges not available in Oracle 26ai CDB (expected behavior)"

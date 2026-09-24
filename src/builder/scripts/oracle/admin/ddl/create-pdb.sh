@@ -114,7 +114,7 @@ while [ $CONNECTION_ATTEMPTS -lt $MAX_ATTEMPTS ]; do
     CONNECTION_ATTEMPTS=$((CONNECTION_ATTEMPTS + 1))
     log_step "Connection attempt $CONNECTION_ATTEMPTS of $MAX_ATTEMPTS..."
 
-    CONNECTION_TEST=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
+    CONNECTION_TEST=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT 'Connected to ' || SYS_CONTEXT('USERENV', 'CON_NAME') AS connection_info FROM DUAL;
@@ -147,7 +147,7 @@ done
 log_section "Step 2: Checking PDB Status"
 log_step "Checking if $PDB_NAME exists..."
 
-PDB_EXISTS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+PDB_EXISTS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -158,7 +158,7 @@ PDB_EXISTS=$(echo "$PDB_EXISTS_RAW" | grep -o '[0-9]' | tail -n1 || echo "0")
 
 if [ "$PDB_EXISTS" != "0" ]; then
     # PDB already exists — check its open_mode
-    PDB_STATUS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    PDB_STATUS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -172,7 +172,7 @@ EOF
 
     if [ "$PDB_STATUS" != "READ WRITE" ]; then
         log_warn "PDB is not open — attempting to open..."
-        sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF > /dev/null 2>&1
+        sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF > /dev/null 2>&1
 ALTER PLUGGABLE DATABASE ${PDB_NAME} OPEN;
 ALTER PLUGGABLE DATABASE ${PDB_NAME} SAVE STATE;
 EXIT
@@ -194,9 +194,9 @@ log_step "Creating PDB $PDB_NAME..."
 
 PDB_DIR=$(echo "$PDB_NAME" | tr '[:upper:]' '[:lower:]')
 
-if sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+if sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 CREATE PLUGGABLE DATABASE ${PDB_NAME}
-  ADMIN USER pdb_admin IDENTIFIED BY ${DB_PASSWORD}
+  ADMIN USER pdb_admin IDENTIFIED BY "${DB_PASSWORD}"
   FILE_NAME_CONVERT = ('/opt/oracle/oradata/FREE/pdbseed/', '/opt/oracle/oradata/FREE/${PDB_DIR}/');
 
 SELECT 'PDB created: ' || name FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -208,7 +208,7 @@ else
     log_error "Failed to create PDB $PDB_NAME"
     echo ""
     log_info "Existing PDBs:"
-    sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 20
 SET FEEDBACK OFF
 COL name FORMAT A30
@@ -225,7 +225,7 @@ fi
 log_section "Step 4: Opening PDB"
 log_step "Opening $PDB_NAME and saving state for auto-start..."
 
-PDB_OPEN_OUTPUT=$(sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF 2>&1
+PDB_OPEN_OUTPUT=$(sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF 2>&1
 ALTER PLUGGABLE DATABASE ${PDB_NAME} OPEN;
 ALTER PLUGGABLE DATABASE ${PDB_NAME} SAVE STATE;
 SELECT 'Status: ' || open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';

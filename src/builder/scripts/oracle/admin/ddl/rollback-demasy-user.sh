@@ -98,7 +98,7 @@ log_section "Step 1: Testing Database Connection"
 log_step "Connecting to CDB\$ROOT..."
 
 # Test connection to CDB$ROOT
-if ! sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' > /dev/null 2>&1
+if ! sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' > /dev/null 2>&1
 SELECT 'Connected to ' || SYS_CONTEXT('USERENV', 'CON_NAME') AS connection_info FROM DUAL;
 EXIT
 EOF
@@ -117,7 +117,7 @@ log_section "Step 2: Checking Current State"
 
 # Check if PDB exists
 log_step "Checking if PDB $PDB_NAME exists..."
-PDB_EXISTS_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+PDB_EXISTS_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -128,7 +128,7 @@ PDB_EXISTS=$(echo "$PDB_EXISTS_RAW" | grep -o '[0-9]' | tail -n1 || echo "0")
 
 # Check if common user exists
 log_step "Checking if common user $COMMON_USER exists..."
-COMMON_USER_EXISTS_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+COMMON_USER_EXISTS_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_users WHERE username = '$(echo $COMMON_USER | tr '[:lower:]' '[:upper:]')';
@@ -141,7 +141,7 @@ COMMON_USER_EXISTS=$(echo "$COMMON_USER_EXISTS_RAW" | grep -o '[0-9]' | tail -n1
 LOCAL_USER_EXISTS="0"
 if [ "$PDB_EXISTS" = "1" ]; then
     log_step "Checking if local user $DEMASY_USER exists in PDB $PDB_NAME..."
-    LOCAL_USER_EXISTS_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+    LOCAL_USER_EXISTS_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -173,7 +173,7 @@ if [ "$PDB_EXISTS" = "1" ] || [ "$COMMON_USER_EXISTS" = "1" ]; then
     # First, clean up all objects owned by the user
     log_step "Cleaning up all objects owned by $COMMON_USER..."
     
-    OBJECT_CLEANUP=$(sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>&1
+    OBJECT_CLEANUP=$(sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>&1
 -- Clean up Oracle AI Database objects (Mining Models)
 BEGIN
     FOR obj IN (SELECT model_name FROM dba_mining_models WHERE owner = '${COMMON_USER}') LOOP
@@ -271,7 +271,7 @@ if [ "$PDB_EXISTS" = "1" ] && [ "$LOCAL_USER_EXISTS" = "1" ]; then
     # First, clean up all objects owned by the user
     log_step "Cleaning up all objects owned by $COMMON_USER..."
     
-    OBJECT_CLEANUP=$(sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>&1
+    OBJECT_CLEANUP=$(sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>&1
 -- Drop all tablespaces owned by user
 BEGIN
     FOR ts IN (SELECT tablespace_name FROM dba_tablespaces 
@@ -759,7 +759,7 @@ EOF
     # Force drop the common user with all remaining objects
     log_step "Force dropping common user $COMMON_USER..."
     
-    COMMON_DROP_RESULT=$(sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>&1
+    COMMON_DROP_RESULT=$(sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>&1
 -- Force drop common user and cascade to remove all objects
 DROP USER ${COMMON_USER} CASCADE;
 SELECT 'COMMON_USER_DROP_SUCCESS' AS status FROM DUAL;
@@ -773,7 +773,7 @@ EOF
         # Try with SYS if SYSTEM failed
         log_warn "SYSTEM user failed, trying SYS for user removal..."
         
-        COMMON_SYS_DROP=$(sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF 2>&1
+        COMMON_SYS_DROP=$(sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF 2>&1
 DROP USER ${COMMON_USER} CASCADE;
 SELECT 'SYS_USER_DROP_SUCCESS' AS status FROM DUAL;
 EXIT
@@ -795,7 +795,7 @@ EOF
     for attempt in {1..3}; do
         sleep 1  # Wait for Oracle to process the drop
         
-        USER_FINAL_CHECK=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+        USER_FINAL_CHECK=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_users WHERE username = '${COMMON_USER}';
@@ -829,7 +829,7 @@ if [ "$COMMON_USER_EXISTS" = "1" ]; then
     log_section "Step 5: Remove Common User"
 
 # Clean up any remaining tablespaces related to demasy/demasylabs
-sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' > /dev/null 2>&1
+sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' > /dev/null 2>&1
 BEGIN
     -- Drop any tablespaces that might contain demasy objects
     FOR ts IN (SELECT tablespace_name FROM dba_tablespaces WHERE tablespace_name LIKE '%DEMASY%' OR tablespace_name LIKE '%SANDBOX%') LOOP
@@ -853,7 +853,7 @@ log_section "Step 6: Remove All Tablespaces"
     
     # Force close all sessions in the PDB first
     log_step "Killing all sessions in PDB $PDB_NAME..."
-    sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF > /dev/null 2>&1
+    sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF > /dev/null 2>&1
 -- Kill all sessions in the PDB
 ALTER PLUGGABLE DATABASE ${PDB_NAME} CLOSE ABORT;
 EOF
@@ -864,7 +864,7 @@ EOF
 fi
 
 # Verify no mining models remain
-REMAINING_MODELS=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+REMAINING_MODELS=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_mining_models WHERE owner = '${COMMON_USER}';
@@ -881,7 +881,7 @@ else
 fi
 
 # Verify no scheduler objects remain
-REMAINING_JOBS=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+REMAINING_JOBS=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_scheduler_jobs WHERE owner = '${COMMON_USER}';
@@ -898,7 +898,7 @@ else
 fi
 
 # Verify no scheduler programs remain
-REMAINING_PROGRAMS=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+REMAINING_PROGRAMS=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_scheduler_programs WHERE owner = '${COMMON_USER}';
@@ -915,7 +915,7 @@ else
 fi
 
 # Verify no advanced queues remain
-REMAINING_QUEUES=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+REMAINING_QUEUES=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_queues WHERE owner = '${COMMON_USER}';
@@ -932,7 +932,7 @@ else
 fi
 
 # Verify no analytics objects remain
-REMAINING_ANALYTICS=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+REMAINING_ANALYTICS=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_cubes WHERE owner = '${COMMON_USER}';
@@ -949,7 +949,7 @@ else
 fi
 
 # Verify no XML schemas remain
-REMAINING_XML=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+REMAINING_XML=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_xml_schemas WHERE owner = '${COMMON_USER}';
@@ -973,7 +973,7 @@ if [ "$PDB_EXISTS" = "1" ]; then
     
     # Force close all sessions in the PDB first
     log_step "Killing all sessions in PDB $PDB_NAME..."
-    sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF > /dev/null 2>&1
+    sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF > /dev/null 2>&1
 -- Kill all sessions in the PDB
 ALTER PLUGGABLE DATABASE ${PDB_NAME} CLOSE ABORT;
 EXIT
@@ -983,7 +983,7 @@ EOF
     log_step "Force dropping PDB $PDB_NAME with all datafiles and objects..."
     
     # Attempt 1: Standard drop with force
-    PDB_DROP_RESULT=$(sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>&1
+    PDB_DROP_RESULT=$(sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>&1
 ALTER PLUGGABLE DATABASE ${PDB_NAME} UNPLUG INTO '/tmp/${PDB_NAME}_temp.xml';
 DROP PLUGGABLE DATABASE ${PDB_NAME} INCLUDING DATAFILES;
 SELECT 'PDB_FORCE_DROP_SUCCESS' AS status FROM DUAL;
@@ -998,7 +998,7 @@ EOF
         # Attempt 2: Use SYS with FORCE option
         log_warn "Standard drop failed, trying SYS with force options..."
         
-        PDB_FORCE_RESULT=$(sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF 2>&1
+        PDB_FORCE_RESULT=$(sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF 2>&1
 -- Force close and drop
 SHUTDOWN ABORT;
 STARTUP;
@@ -1016,7 +1016,7 @@ EOF
             log_warn "Standard drops failed, attempting manual cleanup..."
             
             # Get datafile locations and remove them manually
-            DATAFILE_CLEANUP=$(sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF 2>&1
+            DATAFILE_CLEANUP=$(sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF 2>&1
 -- Manual cleanup sequence
 ALTER SYSTEM SET "_ORACLE_SCRIPT"=true;
 DROP PLUGGABLE DATABASE ${PDB_NAME} INCLUDING DATAFILES FORCE;
@@ -1033,7 +1033,7 @@ EOF
                 log_error "Attempting final emergency cleanup..."
                 
                 # Emergency cleanup - remove references from data dictionary
-                sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF > /dev/null 2>&1
+                sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF > /dev/null 2>&1
 -- Emergency cleanup
 DELETE FROM v\$pdbs WHERE name = '${PDB_NAME}';
 DELETE FROM dba_pdbs WHERE pdb_name = '${PDB_NAME}';
@@ -1052,7 +1052,7 @@ EOF
     for attempt in {1..10}; do
         sleep 3  # Wait for Oracle to process the drop
         
-        PDB_FINAL_CHECK=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>/dev/null
+        PDB_FINAL_CHECK=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>/dev/null
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM v\\$pdbs WHERE name = '${PDB_NAME}';
@@ -1070,7 +1070,7 @@ EOF
             log_warn "PDB still exists on attempt $attempt/10, retrying with nuclear cleanup..."
             
             # Nuclear cleanup on each retry
-            sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF > /dev/null 2>&1
+            sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} AS SYSDBA << EOF > /dev/null 2>&1
 -- Nuclear cleanup attempt
 ALTER SYSTEM SET "_ORACLE_SCRIPT"=true;
 SHUTDOWN ABORT;
@@ -1104,7 +1104,7 @@ log_step "Verifying ALL components have been COMPLETELY removed..."
 
 # Verify PDB is completely gone
 log_step "Final PDB verification..."
-FINAL_PDB_CHECK=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>/dev/null
+FINAL_PDB_CHECK=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF 2>/dev/null
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM v\\$pdbs WHERE name = '${PDB_NAME}';

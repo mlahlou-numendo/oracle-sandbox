@@ -65,7 +65,7 @@ _collect_database_metrics() {
     # Current connections
     query_result=$(sqlcl -S /nolog <<EOF 2>/dev/null
 set heading off feedback off pagesize 0 linesize 1000
-connect ${SANDBOX_DB_USER}/${SANDBOX_DB_PASS}@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_PDB}
+connect ${SANDBOX_DB_USER}/"${SANDBOX_DB_PASS}"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_PDB}
 select count(*) from v\$session;
 exit;
 EOF
@@ -77,7 +77,7 @@ EOF
     # Transaction count
     query_result=$(sqlcl -S /nolog <<EOF 2>/dev/null
 set heading off feedback off pagesize 0 linesize 1000
-connect ${SANDBOX_DB_USER}/${SANDBOX_DB_PASS}@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_PDB}
+connect ${SANDBOX_DB_USER}/"${SANDBOX_DB_PASS}"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_PDB}
 select count(*) from v\$transaction;
 exit;
 EOF

@@ -173,7 +173,7 @@ while [ $CONNECTION_ATTEMPTS -lt $MAX_ATTEMPTS ]; do
     CONNECTION_ATTEMPTS=$((CONNECTION_ATTEMPTS + 1))
     log_step "Connection attempt $CONNECTION_ATTEMPTS of $MAX_ATTEMPTS..."
 
-    if CONNECTION_TEST=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
+    if CONNECTION_TEST=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT 'Connected to ' || SYS_CONTEXT('USERENV', 'CON_NAME') AS connection_info FROM DUAL;
@@ -202,7 +202,7 @@ done
 log_section "Step 2: Verifying Local PDB"
 log_step "Checking if $PDB_NAME exists and is open..."
 
-PDB_STATUS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+PDB_STATUS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -215,7 +215,7 @@ if [ "$PDB_STATUS" = "READ WRITE" ]; then
     log_success "PDB $PDB_NAME is open (READ WRITE)"
 elif [ "$PDB_STATUS" = "MOUNTED" ] || [ "$PDB_STATUS" = "READ ONLY" ]; then
     log_warn "PDB $PDB_NAME is not fully open (status: $PDB_STATUS). Attempting to open..."
-    sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF > /dev/null 2>&1
+    sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF > /dev/null 2>&1
 ALTER PLUGGABLE DATABASE ${PDB_NAME} OPEN;
 ALTER PLUGGABLE DATABASE ${PDB_NAME} SAVE STATE;
 EXIT
@@ -224,7 +224,7 @@ EOF
 else
     log_error "PDB $PDB_NAME not found or unavailable (status: $PDB_STATUS)"
     log_info "Available PDBs:"
-    sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 20
 SET FEEDBACK OFF
 COL name FORMAT A20
@@ -241,7 +241,7 @@ fi
 log_section "Step 3: Verifying Link Owner"
 log_step "Checking if user $OWNER_USER_UPPER exists in PDB $PDB_NAME..."
 
-USER_EXISTS_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+USER_EXISTS_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -255,7 +255,7 @@ if [ "$USER_EXISTS" = "0" ]; then
     log_error "User $OWNER_USER_UPPER does not exist in PDB $PDB_NAME"
     log_info "Use create_user.sh to create the user first."
     log_info "Available users:"
-    sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+    sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 20
 SET FEEDBACK OFF
@@ -274,7 +274,7 @@ log_success "User $OWNER_USER_UPPER found in PDB $PDB_NAME"
 log_section "Step 4: Checking Existing Links"
 log_step "Checking if link $LINK_NAME_UPPER already exists for $OWNER_USER_UPPER..."
 
-LINK_EXISTS_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+LINK_EXISTS_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -288,7 +288,7 @@ LINK_EXISTS=$(echo "$LINK_EXISTS_RAW" | grep -o '[0-9]' | tail -n1 || echo "0")
 
 if [ "$LINK_EXISTS" = "1" ]; then
     log_warn "Link $LINK_NAME_UPPER already exists for $OWNER_USER_UPPER — dropping and recreating..."
-    DROP_OUTPUT=$(sql ${OWNER_USER}/${OWNER_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << EOF 2>&1
+    DROP_OUTPUT=$(sql ${OWNER_USER}/\"${OWNER_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << EOF 2>&1
 DROP DATABASE LINK ${LINK_NAME};
 EXIT
 EOF
@@ -308,7 +308,7 @@ fi
 log_section "Step 5: Creating Database Link"
 log_step "Creating private database link $LINK_NAME for $OWNER_USER_UPPER..."
 
-CREATE_OUTPUT=$(sql ${OWNER_USER}/${OWNER_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << EOF 2>&1
+CREATE_OUTPUT=$(sql ${OWNER_USER}/\"${OWNER_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << EOF 2>&1
 CREATE DATABASE LINK ${LINK_NAME}
   CONNECT TO ${REMOTE_USER} IDENTIFIED BY "${REMOTE_PASSWORD}"
   USING '//${REMOTE_HOST}:${REMOTE_PORT}/${REMOTE_SERVICE}';
@@ -332,7 +332,7 @@ fi
 log_section "Step 6: Verifying Database Link"
 log_step "Testing link connectivity: SELECT FROM DUAL@${LINK_NAME}..."
 
-VERIFY_OUTPUT=$(sql -s ${OWNER_USER}/${OWNER_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << EOF 2>&1
+VERIFY_OUTPUT=$(sql -s ${OWNER_USER}/\"${OWNER_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << EOF 2>&1
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT 'LINK_OK' AS result FROM DUAL@${LINK_NAME};
@@ -376,7 +376,7 @@ echo "   INSERT INTO local_table SELECT * FROM remote_table@${LINK_NAME};"
 echo ""
 
 log_step "All database links owned by $OWNER_USER_UPPER in $PDB_NAME:"
-sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 20
 SET FEEDBACK OFF

@@ -51,7 +51,7 @@ databases:
         quota: "UNLIMITED"
         description: "Sandbox development user with limited privileges"
         privileges:
-          level: "admin"
+          level: "all"
 
       # ─── SANDBOX_AI User (AI/MCP service account) ──────────────────────
       - username: "sandbox_ai"
@@ -145,7 +145,7 @@ databases:
         quota: "UNLIMITED"
         description: "Demasy Labs developer"
         privileges:
-          level: "admin"
+          level: "all"
 
       - username: "demasy_ai"
         enabled: true
@@ -215,7 +215,7 @@ databases:
         quota: "UNLIMITED"
         description: "Demasylabs production developer"
         privileges:
-          level: "admin"
+          level: "all"
 
       - username: "demasylabs_ai"
         enabled: true

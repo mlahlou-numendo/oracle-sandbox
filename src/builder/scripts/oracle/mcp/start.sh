@@ -29,7 +29,7 @@ if [ -z "$SANDBOX_DB_HOST" ] || [ -z "$SANDBOX_DB_PORT" ] || [ -z "$MCP_SERVICE"
     exit 1
 fi
 
-CONN_STRING="${MCP_USER}/${MCP_PASS}@//${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${MCP_SERVICE}"
+CONN_STRING="${MCP_USER}/\"${MCP_PASS}\"@//${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${MCP_SERVICE}"
 CONN_NAME="sandbox-ai-conn"
 
 echo "[MCP] Refreshing saved connection '${CONN_NAME}'..." >&2

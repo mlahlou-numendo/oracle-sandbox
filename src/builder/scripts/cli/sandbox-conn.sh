@@ -150,7 +150,7 @@ _conn_do_add() {
     echo ""
 
     /opt/oracle/sqlcl/bin/sql /nolog <<EOSQL
-CONN -save "${CONN_NAME}" -savepwd ${CONN_USER}/${CONN_PASS}@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}
+CONN -save "${CONN_NAME}" -savepwd ${CONN_USER}/"${CONN_PASS}"@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}
 EXIT
 EOSQL
 

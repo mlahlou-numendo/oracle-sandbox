@@ -42,7 +42,7 @@ _check_oracle_status() {
     # SQL ping - try sqlcl first, fall back to status
     local result
     if command -v sqlplus &>/dev/null; then
-        result=$(echo "SELECT 'OK' FROM DUAL;" | sqlplus -S "${SANDBOX_DB_USER:-system}/${SANDBOX_DB_PASSWORD:-oracle}@//${host}:${port}/${service}" 2>/dev/null | grep "^OK" | head -1)
+        result=$(echo "SELECT 'OK' FROM DUAL;" | sqlplus -S "${SANDBOX_DB_USER:-system}/\"${SANDBOX_DB_PASSWORD:-oracle}\"@//${host}:${port}/${service}" 2>/dev/null | grep "^OK" | head -1)
     else
         result="OK"  # Assume OK if we can't test
     fi
@@ -56,7 +56,7 @@ _check_oracle_status() {
     # PDB status - check if we can query v$pdbs
     local pdb_result
     if command -v sqlplus &>/dev/null; then
-        pdb_result=$(echo "SET HEADING OFF FEEDBACK OFF PAGESIZE 0; SELECT name || ' ' || open_mode FROM v\$pdbs WHERE open_mode IS NOT NULL ORDER BY name;" | sqlplus -S "sys/${SANDBOX_DB_PASSWORD:-oracle}@//${host}:${port}/${SANDBOX_DB_SID:-FREE}" as sysdba 2>/dev/null)
+        pdb_result=$(echo "SET HEADING OFF FEEDBACK OFF PAGESIZE 0; SELECT name || ' ' || open_mode FROM v\$pdbs WHERE open_mode IS NOT NULL ORDER BY name;" | sqlplus -S "sys/\"${SANDBOX_DB_PASSWORD:-oracle}\"@//${host}:${port}/${SANDBOX_DB_SID:-FREE}" as sysdba 2>/dev/null)
     fi
     
     local pdb_count=0

@@ -76,32 +76,32 @@ case "$RESOURCE" in
             sys)
                 CONN_PDB="${SQLCL_PDB:-${SANDBOX_DB_SERVICE}}"
                 log_step "Connecting as SYS (sysdba) @ ${CONN_PDB}..."
-                sql "sys/${CONN_PASS}@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}" as sysdba
+                sql "sys/\"${CONN_PASS}\"@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}" as sysdba
                 ;;
             system)
                 CONN_PDB="${SQLCL_PDB:-${SANDBOX_DB_SERVICE}}"
                 log_step "Connecting as SYSTEM @ ${CONN_PDB}..."
-                sql "system/${CONN_PASS}@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
+                sql "system/\"${CONN_PASS}\"@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
                 ;;
             sandbox)
                 CONN_PDB="${SQLCL_PDB:-SANDBOX_PDB}"
                 log_step "Connecting as SANDBOX @ ${CONN_PDB}..."
-                sql "sandbox/${CONN_PASS}@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
+                sql "sandbox/\"${CONN_PASS}\"@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
                 ;;
             sandbox_ai)
                 CONN_PDB="${SQLCL_PDB:-SANDBOX_PDB}"
                 log_step "Connecting as SANDBOX_AI (AI/MCP user) @ ${CONN_PDB}..."
-                sql "sandbox_ai/${CONN_PASS}@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
+                sql "sandbox_ai/\"${CONN_PASS}\"@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
                 ;;
             demasy)
                 CONN_PDB="${SQLCL_PDB:-DEMASY_PDB}"
                 log_step "Connecting as DEMASY @ ${CONN_PDB}..."
-                sql "demasy/${CONN_PASS}@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
+                sql "demasy/\"${CONN_PASS}\"@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
                 ;;
             demasy_ai)
                 CONN_PDB="${SQLCL_PDB:-DEMASY_PDB}"
                 log_step "Connecting as DEMASY_AI (AI/MCP user) @ ${CONN_PDB}..."
-                sql "demasy_ai/${CONN_PASS}@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
+                sql "demasy_ai/\"${CONN_PASS}\"@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}"
                 ;;
         esac
         ;;
@@ -160,7 +160,7 @@ case "$RESOURCE" in
             CONN_PORT="${SANDBOX_DB_PORT}"
             CONN_PDB="${SANDBOX_DB_SERVICE}"
             
-            sql "system/${CONN_PASS}@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}" <<EOF
+            sql "system/\"${CONN_PASS}\"@//${CONN_HOST}:${CONN_PORT}/${CONN_PDB}" <<EOF
 @${SCRIPT_FILE}
 exit
 EOF

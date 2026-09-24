@@ -106,7 +106,7 @@ mkdir -p /tmp/apex-install
 ################################################################################
 log_info "Step 2: Testing database connection..."
 
-if ! sql system/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} << EOF > /dev/null 2>&1
+if ! sql system/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} << EOF > /dev/null 2>&1
 SELECT 1 FROM DUAL;
 EXIT
 EOF
@@ -122,7 +122,7 @@ log_success "Database connection successful"
 ################################################################################
 log_info "Step 3: Creating tablespaces..."
 
-sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
 ALTER SESSION SET CONTAINER=FREEPDB1;
 
 -- Check if tablespaces already exist
@@ -159,7 +159,7 @@ log_success "Tablespaces created"
 ################################################################################
 log_info "Step 3B: Unlocking APEX/ORDS accounts (if they exist)..."
 
-sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' > /dev/null 2>&1
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' > /dev/null 2>&1
 ALTER SESSION SET CONTAINER=FREEPDB1;
 
 -- Unlock accounts if they exist
@@ -186,7 +186,7 @@ log_info "Step 4: Installing APEX (this takes 3-5 minutes)..."
 
 # Check if APEX is already installed in dba_registry
 log_info "Checking for existing APEX installation..."
-APEX_INSTALLED=$(sql -S sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
+APEX_INSTALLED=$(sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
 SET HEADING OFF FEEDBACK OFF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 SELECT COUNT(*) FROM dba_registry WHERE comp_id='APEX';
@@ -198,7 +198,7 @@ if [ "${APEX_INSTALLED}" != "0" ]; then
     log_warn "APEX is already installed, skipping installation step..."
     
     # Verify APEX version
-    sql -S sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+    sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
 SET HEADING OFF FEEDBACK OFF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 SELECT 'Existing APEX: ' || comp_name || ' ' || version || ' (' || status || ')' 
@@ -213,7 +213,7 @@ else
     # Check for stale APEX schema (partial/failed previous install)
     # If APEX_240200 schema exists but is not in dba_registry, drop it first
     log_info "Checking for stale APEX schema from a previous failed install..."
-    STALE_APEX=$(sql -S sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
+    STALE_APEX=$(sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
 SET HEADING OFF FEEDBACK OFF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 SELECT COUNT(*) FROM dba_users WHERE username LIKE 'APEX_%';
@@ -223,7 +223,7 @@ EOF
 
     if [ "${STALE_APEX}" != "0" ]; then
         log_warn "Stale APEX schema detected — dropping before fresh install..."
-        sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+        sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
 ALTER SESSION SET CONTAINER=FREEPDB1;
 DECLARE
 BEGIN
@@ -261,7 +261,7 @@ log_info "Running APEX installation (this takes 3-5 minutes)..."
 log_info "Monitor progress in another terminal: docker exec sandbox-oracle-server tail -f ${APEX_INSTALL_LOG}"
 
 # Run installation from APEX directory (CRITICAL: cd is required)
-(cd "${APEX_HOME}" && sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba @"${APEX_HOME}/install_apex.sql") > "${APEX_INSTALL_LOG}" 2>&1 &
+(cd "${APEX_HOME}" && sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba @"${APEX_HOME}/install_apex.sql") > "${APEX_INSTALL_LOG}" 2>&1 &
 APEX_PID=$!
 
 # Show progress dots with elapsed time while installation runs
@@ -299,7 +299,7 @@ if [ $APEX_EXIT_CODE -ne 0 ]; then
         
         # Verify APEX is in dba_registry
         log_info "Verifying APEX installation in database..."
-        sql -S sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+        sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
 SET HEADING OFF FEEDBACK OFF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 SELECT 'APEX Status: ' || comp_name || ' ' || version || ' (' || status || ')' 
@@ -319,7 +319,7 @@ fi
 log_info "Step 5: Configuring APEX and creating/updating ADMIN user..."
 
 # Always recreate and unlock ADMIN user with correct password
-sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
 ALTER SESSION SET CONTAINER=FREEPDB1;
 
 BEGIN
@@ -351,7 +351,7 @@ END;
 /
 
 -- Unlock all APEX/ORDS user accounts with standard password
-ALTER USER APEX_PUBLIC_USER IDENTIFIED BY ${APEX_PASSWORD};
+ALTER USER APEX_PUBLIC_USER IDENTIFIED BY "${APEX_PASSWORD}";
 ALTER USER APEX_PUBLIC_USER ACCOUNT UNLOCK;
 ALTER USER APEX_PUBLIC_ROUTER ACCOUNT UNLOCK;
 GRANT CREATE SESSION TO APEX_PUBLIC_USER;
@@ -376,7 +376,7 @@ WORKSPACE_SCHEMA="${APEX_DEFAULT_WORKSPACE_SCHEMA:-${WORKSPACE_NAME}}"
 WORKSPACE_SCHEMA_LOWER="$(echo "${WORKSPACE_SCHEMA}" | tr '[:upper:]' '[:lower:]')"
 WORKSPACE_ADMIN="${APEX_ADMIN_USERNAME:-demasylabs}"
 
-sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
 ALTER SESSION SET CONTAINER=FREEPDB1;
 SET SERVEROUTPUT ON
 
@@ -477,7 +477,7 @@ log_info "Step 6: Configuring APEX REST..."
 
 if [ -f "${APEX_HOME}/apex_rest_config.sql" ]; then
     log_info "Running APEX REST configuration..."
-    sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' 2>&1 | tee /tmp/apex_rest_config.log
+    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' 2>&1 | tee /tmp/apex_rest_config.log
 ALTER SESSION SET CONTAINER=FREEPDB1;
 @/opt/oracle/apex/apex_rest_config.sql
 EXIT
@@ -524,7 +524,7 @@ cd ${ORDS_CONFIG}
 
 # Check if ORDS is already installed
 log_info "Checking for existing ORDS installation..."
-ORDS_INSTALLED=$(sql -S sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
+ORDS_INSTALLED=$(sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
 SET HEADING OFF FEEDBACK OFF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 SELECT COUNT(*) FROM dba_users WHERE username = 'ORDS_PUBLIC_USER';
@@ -571,7 +571,7 @@ if [ $? -eq 0 ] || [ "${ORDS_INSTALLED}" != "0" ]; then
     
     # Unlock ORDS accounts to prevent connection issues
     log_info "Unlocking ORDS accounts..."
-    sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' > /dev/null 2>&1
+    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' > /dev/null 2>&1
 ALTER SESSION SET CONTAINER=FREEPDB1;
 ALTER USER ORDS_PUBLIC_USER ACCOUNT UNLOCK;
 ALTER USER ORDS_METADATA ACCOUNT UNLOCK;
@@ -580,7 +580,7 @@ EOSQL
     
     # Verify ORDS installation
     log_info "Verifying ORDS schemas..."
-    sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
 ALTER SESSION SET CONTAINER=FREEPDB1;
 SELECT 'ORDS Schema: ' || username || ' (Status: ' || account_status || ')' AS status
 FROM dba_users 
@@ -598,7 +598,7 @@ fi
 ################################################################################
 log_info "Step 8B: Verifying ORDS schemas and SQL Developer Web..."
 
-sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
 ALTER SESSION SET CONTAINER=FREEPDB1;
 
 -- Verify ORDS schemas
@@ -628,7 +628,7 @@ _WS_SCHEMA="${WORKSPACE_SCHEMA:-SANDBOX}"
 _WS_PATTERN="$(echo "${_WS_SCHEMA}" | tr '[:upper:]' '[:lower:]')"
 log_info "Step 8C: REST-enabling workspace schema ${_WS_SCHEMA} for SQL Developer Web..."
 
-sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
 ALTER SESSION SET CONTAINER=FREEPDB1;
 SET SERVEROUTPUT ON
 
@@ -872,7 +872,7 @@ log_info "Step 11: Starting ORDS..."
 # Ensure all accounts are unlocked before starting ORDS
 log_info "Final account unlock and password verification (resetting to default password)..."
 # Reset and unlock a standard list of users to the configured APEX_PASSWORD.
-sql sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
 SET DEFINE OFF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 BEGIN
@@ -882,7 +882,7 @@ BEGIN
            OR username LIKE 'APEX\_%' ESCAPE '\'
     ) LOOP
         BEGIN
-            EXECUTE IMMEDIATE 'ALTER USER ' || r.username || ' IDENTIFIED BY ${APEX_PASSWORD}';
+            EXECUTE IMMEDIATE 'ALTER USER ' || r.username || ' IDENTIFIED BY "${APEX_PASSWORD}"';
             EXECUTE IMMEDIATE 'ALTER USER ' || r.username || ' ACCOUNT UNLOCK';
             DBMS_OUTPUT.PUT_LINE('Unlocked: ' || r.username);
         EXCEPTION
@@ -978,7 +978,7 @@ echo "=================================================================="
 echo " Database Status:"
 echo "=================================================================="
 
-sql -S sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' | sed 's/^  /  \xe2\x9c\x93 /'
+sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' | sed 's/^  /  \xe2\x9c\x93 /'
 SET HEADING OFF FEEDBACK OFF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 
@@ -1006,7 +1006,7 @@ echo "=================================================================="
 echo " ADMIN User Status:"
 echo "=================================================================="
 
-sql -S sys/${SYS_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
 SET HEADING OFF FEEDBACK OFF
 ALTER SESSION SET CONTAINER=FREEPDB1;
 BEGIN APEX_UTIL.SET_WORKSPACE('INTERNAL'); END;

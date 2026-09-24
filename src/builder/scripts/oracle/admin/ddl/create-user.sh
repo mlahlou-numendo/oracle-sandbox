@@ -131,7 +131,7 @@ while [ $CONNECTION_ATTEMPTS -lt $MAX_ATTEMPTS ]; do
     CONNECTION_ATTEMPTS=$((CONNECTION_ATTEMPTS + 1))
     log_step "Connection attempt $CONNECTION_ATTEMPTS of $MAX_ATTEMPTS..."
 
-    if CONNECTION_TEST=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
+    if CONNECTION_TEST=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT 'Connected to ' || SYS_CONTEXT('USERENV', 'CON_NAME') AS connection_info FROM DUAL;
@@ -166,7 +166,7 @@ log_section "Step 2: Checking Target PDB"
 log_step "Checking if $PDB_NAME exists and is open..."
 
 # Query 1: does the PDB exist at all?
-PDB_EXISTS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+PDB_EXISTS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -181,9 +181,9 @@ if [ "$PDB_EXISTS" = "0" ]; then
     # Derive a safe lowercase directory name from the PDB name
     PDB_DIR=$(echo "$PDB_NAME" | tr '[:upper:]' '[:lower:]')
 
-    if sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    if sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 CREATE PLUGGABLE DATABASE ${PDB_NAME}
-  ADMIN USER pdb_admin IDENTIFIED BY ${NEW_USER_PASSWORD}
+  ADMIN USER pdb_admin IDENTIFIED BY "${NEW_USER_PASSWORD}"
   FILE_NAME_CONVERT = ('/opt/oracle/oradata/FREE/pdbseed/', '/opt/oracle/oradata/FREE/${PDB_DIR}/');
 
 SELECT 'PDB created: ' || name FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -194,7 +194,7 @@ EOF
     else
         log_error "Failed to create PDB $PDB_NAME"
         log_info "Available PDBs:"
-        sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+        sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 20
 SET FEEDBACK OFF
 COL name FORMAT A20
@@ -207,7 +207,7 @@ EOF
 
     # Open the newly created PDB and save state for auto-start
     log_step "Opening PDB $PDB_NAME..."
-    PDB_OPEN_OUTPUT=$(sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF 2>&1
+    PDB_OPEN_OUTPUT=$(sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF 2>&1
 ALTER PLUGGABLE DATABASE ${PDB_NAME} OPEN;
 ALTER PLUGGABLE DATABASE ${PDB_NAME} SAVE STATE;
 SELECT 'Status: ' || open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -225,7 +225,7 @@ EOF
 
 else
     # Query 2: PDB exists — check its open_mode
-    PDB_STATUS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    PDB_STATUS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -239,14 +239,14 @@ EOF
     else
         log_warn "PDB $PDB_NAME exists but is not open (status: $PDB_STATUS). Attempting to open..."
 
-        sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF > /dev/null 2>&1
+        sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF > /dev/null 2>&1
 ALTER PLUGGABLE DATABASE ${PDB_NAME} OPEN;
 ALTER PLUGGABLE DATABASE ${PDB_NAME} SAVE STATE;
 EXIT
 EOF
 
         # Verify it's now open
-        PDB_STATUS_RECHECK=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+        PDB_STATUS_RECHECK=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -268,7 +268,7 @@ fi
 log_section "Step 3: Creating Common User in CDB"
 log_step "Checking if common user $COMMON_USER exists..."
 
-COMMON_USER_EXISTS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+COMMON_USER_EXISTS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT COUNT(*) FROM dba_users WHERE username = '$(echo $COMMON_USER | tr '[:lower:]' '[:upper:]')';
@@ -283,8 +283,8 @@ if [ "$COMMON_USER_EXISTS" = "1" ]; then
 else
     log_step "Creating common user $COMMON_USER in CDB..."
 
-    if sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
-CREATE USER ${COMMON_USER} IDENTIFIED BY ${NEW_USER_PASSWORD};
+    if sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+CREATE USER ${COMMON_USER} IDENTIFIED BY "${NEW_USER_PASSWORD}";
 SELECT 'Common user created successfully' AS status FROM DUAL;
 EXIT
 EOF
@@ -303,7 +303,7 @@ fi
 log_section "Step 4: Creating Local User in PDB"
 log_step "Checking if local user $NEW_USER exists in PDB $PDB_NAME..."
 
-LOCAL_USER_EXISTS_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+LOCAL_USER_EXISTS_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -319,12 +319,12 @@ if [ "$LOCAL_USER_EXISTS" = "1" ]; then
 else
     log_step "Creating local user $NEW_USER in PDB $PDB_NAME with comprehensive privileges..."
 
-    if sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+    if sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 -- Switch to PDB
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 
 -- Create local user
-CREATE USER ${NEW_USER} IDENTIFIED BY ${NEW_USER_PASSWORD};
+CREATE USER ${NEW_USER} IDENTIFIED BY "${NEW_USER_PASSWORD}";
 
 -- Basic connectivity and resource
 GRANT CONNECT TO ${NEW_USER};
@@ -617,7 +617,7 @@ log_section "Step 5: Verification"
 log_step "Verifying all operations completed successfully..."
 
 # Verify local user exists
-LOCAL_USER_EXISTS_FINAL=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+LOCAL_USER_EXISTS_FINAL=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -635,7 +635,7 @@ else
 fi
 
 # Verify system privilege count
-SYS_PRIV_COUNT_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+SYS_PRIV_COUNT_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -645,7 +645,7 @@ EOF
 )
 SYS_PRIV_COUNT=$(echo "$SYS_PRIV_COUNT_RAW" | grep -o '[0-9]*' | tail -n1 || echo "0")
 
-ROLE_COUNT_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+ROLE_COUNT_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -664,7 +664,7 @@ fi
 # Test connection to PDB as the new user
 log_step "Testing connection as $NEW_USER..."
 TEST_TABLE="${NEW_USER}_conn_test"
-TEST_OUTPUT=$(sql -s ${NEW_USER}/${NEW_USER_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << EOF 2>&1
+TEST_OUTPUT=$(sql -s ${NEW_USER}/\"${NEW_USER_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << EOF 2>&1
 SET PAGESIZE 0
 SET FEEDBACK OFF
 CREATE TABLE ${TEST_TABLE} (id NUMBER, msg VARCHAR2(100));
@@ -682,7 +682,7 @@ elif echo "$TEST_OUTPUT" | grep -q "Connection and privileges verified"; then
     log_success "✓ Connection and basic operations successful"
 else
     log_warn "⚠ Full test had issues, trying simple connection test..."
-    SIMPLE_TEST=$(sql -s ${NEW_USER}/${NEW_USER_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << 'EOF' 2>&1
+    SIMPLE_TEST=$(sql -s ${NEW_USER}/\"${NEW_USER_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME} << 'EOF' 2>&1
 SELECT 'SIMPLE_SUCCESS' FROM DUAL;
 EXIT
 EOF
@@ -715,7 +715,7 @@ echo ""
 echo "🔗 Connection Examples:"
 echo "   • SQLcl:    sql ${NEW_USER}/password@//${DB_HOST}:${DB_PORT}/${PDB_NAME}"
 echo "   • SQL*Plus: sqlplus ${NEW_USER}/password@${DB_HOST}:${DB_PORT}/${PDB_NAME}"
-echo "   • Container: sql ${NEW_USER}/${NEW_USER_PASSWORD}@//${DB_HOST}:${DB_PORT}/${PDB_NAME}"
+echo "   • Container: sql ${NEW_USER}/\"${NEW_USER_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${PDB_NAME}"
 echo ""
 echo "💡 Notes:"
 echo "   • SYSDBA privileges not available in Oracle 26ai CDB (expected behavior)"

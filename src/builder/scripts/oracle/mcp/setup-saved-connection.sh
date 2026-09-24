@@ -30,7 +30,7 @@ CONN_DIR="${HOME:-/home/sandbox}/.dbtools/connections"
 mkdir -p "$CONN_DIR"
 
 /opt/oracle/sqlcl/bin/sql /nolog <<EOSQL
-CONN -save sandbox-ai-conn -savepwd ${SANDBOX_DB_MCP_USER}/${SANDBOX_DB_PASSWORD}@//${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_MCP_SERVICE}
+CONN -save sandbox-ai-conn -savepwd ${SANDBOX_DB_MCP_USER}/"${SANDBOX_DB_PASSWORD}"@//${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_MCP_SERVICE}
 EXIT
 EOSQL
 

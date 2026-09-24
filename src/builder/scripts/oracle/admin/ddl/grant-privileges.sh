@@ -166,7 +166,7 @@ while [ $CONNECTION_ATTEMPTS -lt $MAX_ATTEMPTS ]; do
     CONNECTION_ATTEMPTS=$((CONNECTION_ATTEMPTS + 1))
     log_step "Connection attempt $CONNECTION_ATTEMPTS of $MAX_ATTEMPTS..."
 
-    if CONNECTION_TEST=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
+    if CONNECTION_TEST=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << 'EOF' 2>&1
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT 'Connected to ' || SYS_CONTEXT('USERENV', 'CON_NAME') AS connection_info FROM DUAL;
@@ -194,7 +194,7 @@ done
 log_section "Step 2: Verifying Target PDB"
 log_step "Checking if $PDB_NAME exists and is open..."
 
-PDB_STATUS_RAW=$(sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+PDB_STATUS_RAW=$(sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 0
 SET FEEDBACK OFF
 SELECT open_mode FROM v\$pdbs WHERE name = '${PDB_NAME}';
@@ -207,7 +207,7 @@ if [ "$PDB_STATUS" = "READ WRITE" ]; then
     log_success "PDB $PDB_NAME is open (READ WRITE)"
 elif [ "$PDB_STATUS" = "MOUNTED" ] || [ "$PDB_STATUS" = "READ ONLY" ]; then
     log_warn "PDB $PDB_NAME is not fully open (status: $PDB_STATUS). Attempting to open..."
-    sql sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF > /dev/null 2>&1
+    sql sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF > /dev/null 2>&1
 ALTER PLUGGABLE DATABASE ${PDB_NAME} OPEN;
 ALTER PLUGGABLE DATABASE ${PDB_NAME} SAVE STATE;
 EXIT
@@ -216,7 +216,7 @@ EOF
 else
     log_error "PDB $PDB_NAME not found or unavailable (status: $PDB_STATUS)"
     log_info "Available PDBs:"
-    sql -s sys/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
+    sql -s sys/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} as sysdba << EOF
 SET PAGESIZE 20
 SET FEEDBACK OFF
 COL name FORMAT A20
@@ -233,7 +233,7 @@ fi
 log_section "Step 3: Verifying Target User"
 log_step "Checking if user $TARGET_USER exists in PDB $PDB_NAME..."
 
-USER_EXISTS_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+USER_EXISTS_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -247,7 +247,7 @@ if [ "$USER_EXISTS" = "0" ]; then
     log_error "User $TARGET_USER does not exist in PDB $PDB_NAME"
     log_info "Use create_user.sh to create the user first."
     log_info "Available users:"
-    sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+    sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 20
 SET FEEDBACK OFF
@@ -592,7 +592,7 @@ log_success "Grant SQL prepared for level: $PRIV_LEVEL"
 log_section "Step 5: Executing Privilege Grants"
 log_step "Granting $PRIV_LEVEL privileges to $TARGET_USER in PDB $PDB_NAME..."
 
-if GRANT_OUTPUT=$(sql system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} @"$GRANT_SQL" 2>&1); then
+if GRANT_OUTPUT=$(sql system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} @"$GRANT_SQL" 2>&1); then
     if echo "$GRANT_OUTPUT" | grep -qi "ORA-[0-9]"; then
         # Some grants may fail (e.g. privilege not available in this edition) — warn but don't fail
         WARN_LINES=$(echo "$GRANT_OUTPUT" | grep -i "ORA-[0-9]" | head -5)
@@ -618,7 +618,7 @@ fi
 log_section "Step 6: Verification"
 log_step "Verifying privilege counts for $TARGET_USER..."
 
-SYS_PRIV_COUNT_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+SYS_PRIV_COUNT_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF
@@ -628,7 +628,7 @@ EOF
 )
 SYS_PRIV_COUNT=$(echo "$SYS_PRIV_COUNT_RAW" | grep -o '[0-9]*' | tail -n1 || echo "0")
 
-ROLE_COUNT_RAW=$(sql -s system/${DB_PASSWORD}@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
+ROLE_COUNT_RAW=$(sql -s system/\"${DB_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SID} << EOF
 ALTER SESSION SET CONTAINER = ${PDB_NAME};
 SET PAGESIZE 0
 SET FEEDBACK OFF

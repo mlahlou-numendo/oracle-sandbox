@@ -118,7 +118,7 @@ if [ "$INSTALL_APEX" = "true" ]; then
             WAIT_ELAPSED=0
             
             while [ $WAIT_ELAPSED -lt $WAIT_TIMEOUT ]; do
-                if sql -S ${SANDBOX_DB_USER}/${SANDBOX_DB_PASS}@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE} <<EOF 2>/dev/null | grep -q "1"
+                if sql -S ${SANDBOX_DB_USER}/\"${SANDBOX_DB_PASS}\"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE} <<EOF 2>/dev/null | grep -q "1"
 SET HEADING OFF
 SET FEEDBACK OFF
 SET PAGESIZE 0
@@ -168,7 +168,7 @@ if [[ -n "$SANDBOX_DB_HOST" && -n "$SANDBOX_DB_PORT" && -n "$SANDBOX_DB_SERVICE"
 
         # Wait for database to be ready
         while [ "$WAIT_ELAPSED" -lt "$WAIT_TIMEOUT" ]; do
-            if sql -S "${SANDBOX_DB_USER}/${SANDBOX_DB_PASS}@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE}" <<EOF 2>/dev/null | grep -q "1"
+            if sql -S "${SANDBOX_DB_USER}/\"${SANDBOX_DB_PASS}\"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE}" <<EOF 2>/dev/null | grep -q "1"
 SET HEADING OFF
 SET FEEDBACK OFF
 SET PAGESIZE 0

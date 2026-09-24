@@ -107,7 +107,7 @@ echo "Connecting to database..."
 echo ""
 
 # Connect to Oracle
-sql "$SANDBOX_DB_USER/$SANDBOX_DB_PASS@$SANDBOX_DB_HOST:$SANDBOX_DB_PORT/$SANDBOX_DB_SERVICE" || {
+sql "$SANDBOX_DB_USER/\"$SANDBOX_DB_PASS\"@$SANDBOX_DB_HOST:$SANDBOX_DB_PORT/$SANDBOX_DB_SERVICE" || {
   echo ""
   log_error "Connection Failed"
   echo ""
