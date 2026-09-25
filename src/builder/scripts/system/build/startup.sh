@@ -19,7 +19,7 @@ source /usr/sandbox/app/system/utils/commands.sh
 # so it can only appear in query output — SQLcl's connection-failure text
 # (ORA-12541, port 1521, ...) contains digits, so grepping for "1" false-passes.
 db_is_ready() {
-    sql -S "${SANDBOX_DB_USER}/\"${SANDBOX_DB_PASS}\"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE}" <<EOF 2>/dev/null | grep -q '^DB_READY$'
+    sql -S "${SANDBOX_DB_USER}/\"${SANDBOX_DB_PASS}\"@${SANDBOX_DB_HOST}:${SANDBOX_DB_PORT}/${SANDBOX_DB_SERVICE}" <<EOF 2>/dev/null | grep -q '^DB_READY[[:space:]]*$'
 SET HEADING OFF
 SET FEEDBACK OFF
 SET PAGESIZE 0

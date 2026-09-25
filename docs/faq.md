@@ -170,7 +170,7 @@ Check the log if it doesn't come back: `sandbox logs ords`
 
 **Q: Why does the MCP `connect` tool return an error?**
 
-This is expected SQLcl MCP behavior — the connect tool always returns an error message even when the connection succeeds. Ignore it and proceed to run queries with `run-sql` or `run-sqlcl`.
+Older SQLcl releases (e.g. 25.2) failed to resolve the Oracle AI Database version and returned an error even when the connection succeeded. The sandbox now ships SQLcl 26.2.2, where `connect` works normally. If you still see the error, check `ENV_SRC_ORACLE_SQLCL` in `.env` and rebuild. Run queries with `sql_run` or `sqlcl_run` (named `run-sql` / `run-sqlcl` before SQLcl 26.2).
 
 ---
 

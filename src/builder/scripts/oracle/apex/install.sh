@@ -39,6 +39,15 @@ APEX_PASSWORD="${SANDBOX_APEX_ADMIN_PASSWORD}"
 APEX_EMAIL="${SANDBOX_APEX_EMAIL}"
 APEX_WORKSPACE="${SANDBOX_APEX_DEFAULT_WORKSPACE}"
 
+# PDB that APEX and ORDS are installed into. Every sysdba session switches to it,
+# and ORDS connects to its default service (named after the PDB).
+APEX_PDB="${SANDBOX_APEX_PDB:-FREEPDB1}"
+APEX_PDB="${APEX_PDB^^}"
+if [[ ! "${APEX_PDB}" =~ ^[A-Z][A-Z0-9_]{0,29}$ ]]; then
+    log_error "Invalid SANDBOX_APEX_PDB '${APEX_PDB}' (letters, digits and underscores, max 30 chars)"
+    exit 1
+fi
+
 # Configuration - Use environment variables (with sensible fallbacks)
 APEX_HOME="${SANDBOX_APEX_HOME:-/opt/oracle/apex}"
 APEX_IMAGES_DIR="${SANDBOX_APEX_IMAGES_DIR:-/tmp/i}"
@@ -107,20 +116,23 @@ mkdir -p /tmp/apex-install
 log_info "Step 2: Testing database connection..."
 
 # Retry rather than fail on the first attempt: on `docker compose up` this runs
-# while the DB container is still opening FREEPDB1 and resetting passwords.
+# while the DB container is still opening its PDBs and resetting passwords, and
+# in parallel with startup.sh creating the non-default PDBs from YAML. Connecting
+# through the APEX PDB's own service only succeeds once that PDB is open.
 # The concatenated marker can only appear in real query output.
+log_info "Target PDB: ${APEX_PDB}"
 DB_CONNECT_TIMEOUT="${SANDBOX_APEX_DB_CONNECT_TIMEOUT:-300}"
 DB_CONNECT_ELAPSED=0
-until DB_CONNECT_OUTPUT=$(sql -S system/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} 2>&1 << EOF
+until DB_CONNECT_OUTPUT=$(sql -S system/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${APEX_PDB} 2>&1 << EOF
 SET HEADING OFF
 SET FEEDBACK OFF
 SET PAGESIZE 0
 SELECT 'DB_' || 'READY' FROM DUAL;
 EXIT
 EOF
-) && grep -q '^DB_READY$' <<< "${DB_CONNECT_OUTPUT}"; do
+) && grep -q '^DB_READY[[:space:]]*$' <<< "${DB_CONNECT_OUTPUT}"; do
     if [ "${DB_CONNECT_ELAPSED}" -ge "${DB_CONNECT_TIMEOUT}" ]; then
-        log_error "Cannot connect to database at ${DB_HOST}:${DB_PORT}/${DB_SERVICE} after ${DB_CONNECT_TIMEOUT}s"
+        log_error "Cannot connect to PDB at ${DB_HOST}:${DB_PORT}/${APEX_PDB} after ${DB_CONNECT_TIMEOUT}s"
         echo "${DB_CONNECT_OUTPUT}" | grep -m3 -E 'ORA-|Error'
         exit 1
     fi
@@ -137,16 +149,21 @@ log_success "Database connection successful"
 log_info "Step 3: Creating tablespaces..."
 
 sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 
 -- Check if tablespaces already exist
 DECLARE
-    v_count NUMBER;
+    v_count    NUMBER;
+    v_data_dir VARCHAR2(513);
 BEGIN
+    -- Put the datafiles next to the PDB's own, since each PDB has its own directory
+    SELECT SUBSTR(file_name, 1, INSTR(file_name, '/', -1)) INTO v_data_dir
+    FROM dba_data_files WHERE tablespace_name = 'SYSTEM' AND ROWNUM = 1;
+
     -- Create APEX tablespace if it doesn't exist
     SELECT COUNT(*) INTO v_count FROM dba_tablespaces WHERE tablespace_name = '${APEX_TABLE_SPACE}';
     IF v_count = 0 THEN
-        EXECUTE IMMEDIATE q'[CREATE TABLESPACE ${APEX_TABLE_SPACE} DATAFILE '/opt/oracle/oradata/FREE/FREEPDB1/apex01.dbf' SIZE ${APEX_TABLESPACE_SIZE} AUTOEXTEND ON NEXT ${APEX_TABLESPACE_AUTOEXTEND} MAXSIZE UNLIMITED]';
+        EXECUTE IMMEDIATE 'CREATE TABLESPACE ${APEX_TABLE_SPACE} DATAFILE ''' || v_data_dir || 'apex01.dbf'' SIZE ${APEX_TABLESPACE_SIZE} AUTOEXTEND ON NEXT ${APEX_TABLESPACE_AUTOEXTEND} MAXSIZE UNLIMITED';
         DBMS_OUTPUT.PUT_LINE('${APEX_TABLE_SPACE} tablespace created');
     ELSE
         DBMS_OUTPUT.PUT_LINE('${APEX_TABLE_SPACE} tablespace already exists');
@@ -155,7 +172,7 @@ BEGIN
     -- Create APEX_FILES tablespace if it doesn't exist
     SELECT COUNT(*) INTO v_count FROM dba_tablespaces WHERE tablespace_name = '${APEX_TABLE_SPACE_FILES}';
     IF v_count = 0 THEN
-        EXECUTE IMMEDIATE q'[CREATE TABLESPACE ${APEX_TABLE_SPACE_FILES} DATAFILE '/opt/oracle/oradata/FREE/FREEPDB1/apex_files01.dbf' SIZE ${APEX_TABLESPACE_SIZE} AUTOEXTEND ON NEXT ${APEX_TABLESPACE_AUTOEXTEND} MAXSIZE UNLIMITED]';
+        EXECUTE IMMEDIATE 'CREATE TABLESPACE ${APEX_TABLE_SPACE_FILES} DATAFILE ''' || v_data_dir || 'apex_files01.dbf'' SIZE ${APEX_TABLESPACE_SIZE} AUTOEXTEND ON NEXT ${APEX_TABLESPACE_AUTOEXTEND} MAXSIZE UNLIMITED';
         DBMS_OUTPUT.PUT_LINE('${APEX_TABLE_SPACE_FILES} tablespace created');
     ELSE
         DBMS_OUTPUT.PUT_LINE('${APEX_TABLE_SPACE_FILES} tablespace already exists');
@@ -173,8 +190,8 @@ log_success "Tablespaces created"
 ################################################################################
 log_info "Step 3B: Unlocking APEX/ORDS accounts (if they exist)..."
 
-sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' > /dev/null 2>&1
-ALTER SESSION SET CONTAINER=FREEPDB1;
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL > /dev/null 2>&1
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 
 -- Unlock accounts if they exist
 DECLARE
@@ -202,7 +219,7 @@ log_info "Step 4: Installing APEX (this takes 3-5 minutes)..."
 log_info "Checking for existing APEX installation..."
 APEX_INSTALLED=$(sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
 SET HEADING OFF FEEDBACK OFF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SELECT COUNT(*) FROM dba_registry WHERE comp_id='APEX';
 EXIT
 EOF
@@ -212,9 +229,9 @@ if [ "${APEX_INSTALLED}" != "0" ]; then
     log_warn "APEX is already installed, skipping installation step..."
     
     # Verify APEX version
-    sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+    sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
 SET HEADING OFF FEEDBACK OFF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SELECT 'Existing APEX: ' || comp_name || ' ' || version || ' (' || status || ')' 
 FROM dba_registry WHERE comp_id='APEX';
 EXIT
@@ -229,7 +246,7 @@ else
     log_info "Checking for stale APEX schema from a previous failed install..."
     STALE_APEX=$(sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
 SET HEADING OFF FEEDBACK OFF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SELECT COUNT(*) FROM dba_users WHERE username LIKE 'APEX_%';
 EXIT
 EOF
@@ -237,8 +254,8 @@ EOF
 
     if [ "${STALE_APEX}" != "0" ]; then
         log_warn "Stale APEX schema detected — dropping before fresh install..."
-        sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
-ALTER SESSION SET CONTAINER=FREEPDB1;
+        sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 DECLARE
 BEGIN
     FOR rec IN (SELECT username FROM dba_users WHERE username LIKE 'APEX_%' ORDER BY username DESC) LOOP
@@ -266,7 +283,7 @@ if [ "$SKIP_APEX_INSTALL" = false ]; then
     APEX_INSTALL_SQL="/tmp/install_apex.sql"
     log_info "Creating APEX installation SQL script..."
 cat > "${APEX_INSTALL_SQL}" << SQL_EOF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 @${APEX_HOME}/apexins.sql ${APEX_TABLE_SPACE} ${APEX_TABLE_SPACE_FILES} TEMP /i/
 EXIT
 SQL_EOF
@@ -317,9 +334,9 @@ if [ $APEX_EXIT_CODE -ne 0 ]; then
         
         # Verify APEX is in dba_registry
         log_info "Verifying APEX installation in database..."
-        sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+        sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
 SET HEADING OFF FEEDBACK OFF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SELECT 'APEX Status: ' || comp_name || ' ' || version || ' (' || status || ')' 
 FROM dba_registry WHERE comp_id='APEX';
 EXIT
@@ -338,7 +355,7 @@ log_info "Step 5: Configuring APEX and creating/updating ADMIN user..."
 
 # Always recreate and unlock ADMIN user with correct password
 sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 
 BEGIN
     -- Set workspace context to INTERNAL (always exists)
@@ -395,7 +412,7 @@ WORKSPACE_SCHEMA_LOWER="$(echo "${WORKSPACE_SCHEMA}" | tr '[:upper:]' '[:lower:]
 WORKSPACE_ADMIN="${APEX_ADMIN_USERNAME:-demasylabs}"
 
 sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SET SERVEROUTPUT ON
 
 DECLARE
@@ -501,7 +518,7 @@ log_success "Workspace ${WORKSPACE_NAME:-SANDBOX} created with admin ${WORKSPACE
 log_info "Step 5D: Activating workspace ${WORKSPACE_NAME}..."
 
 WS_STATUS=$(sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL 2>&1 | grep -o 'WS_STATUS=[A-Z]*'
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SET SERVEROUTPUT ON FEEDBACK OFF
 DECLARE
     v_apex_schema VARCHAR2(128);
@@ -533,8 +550,8 @@ log_info "Step 6: Configuring APEX REST..."
 
 if [ -f "${APEX_HOME}/apex_rest_config.sql" ]; then
     log_info "Running APEX REST configuration..."
-    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' 2>&1 | tee /tmp/apex_rest_config.log
-ALTER SESSION SET CONTAINER=FREEPDB1;
+    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL 2>&1 | tee /tmp/apex_rest_config.log
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 @/opt/oracle/apex/apex_rest_config.sql
 EXIT
 EOSQL
@@ -582,7 +599,7 @@ cd ${ORDS_CONFIG}
 log_info "Checking for existing ORDS installation..."
 ORDS_INSTALLED=$(sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOF 2>/dev/null | tr -d '[:space:]'
 SET HEADING OFF FEEDBACK OFF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SELECT COUNT(*) FROM dba_users WHERE username = 'ORDS_PUBLIC_USER';
 EXIT
 EOF
@@ -604,7 +621,7 @@ if [ "${ORDS_INSTALLED}" = "0" ]; then
 --admin-user SYS \
 --db-hostname ${DB_HOST} \
 --db-port ${DB_PORT} \
---db-servicename ${DB_SERVICE} \
+--db-servicename ${APEX_PDB} \
 --proxy-user \
 --feature-db-api true \
 --feature-rest-enabled-sql true \
@@ -627,8 +644,8 @@ if [ $? -eq 0 ] || [ "${ORDS_INSTALLED}" != "0" ]; then
     
     # Unlock ORDS accounts to prevent connection issues
     log_info "Unlocking ORDS accounts..."
-    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' > /dev/null 2>&1
-ALTER SESSION SET CONTAINER=FREEPDB1;
+    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL > /dev/null 2>&1
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 ALTER USER ORDS_PUBLIC_USER ACCOUNT UNLOCK;
 ALTER USER ORDS_METADATA ACCOUNT UNLOCK;
 EXIT
@@ -636,8 +653,8 @@ EOSQL
     
     # Verify ORDS installation
     log_info "Verifying ORDS schemas..."
-    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
-ALTER SESSION SET CONTAINER=FREEPDB1;
+    sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SELECT 'ORDS Schema: ' || username || ' (Status: ' || account_status || ')' AS status
 FROM dba_users 
 WHERE username IN ('ORDS_PUBLIC_USER', 'ORDS_METADATA')
@@ -654,8 +671,8 @@ fi
 ################################################################################
 log_info "Step 8B: Verifying ORDS schemas and SQL Developer Web..."
 
-sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
-ALTER SESSION SET CONTAINER=FREEPDB1;
+sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 
 -- Verify ORDS schemas
 SELECT 'ORDS Schema Status:' FROM DUAL;
@@ -685,7 +702,7 @@ _WS_PATTERN="$(echo "${_WS_SCHEMA}" | tr '[:upper:]' '[:lower:]')"
 log_info "Step 8C: REST-enabling workspace schema ${_WS_SCHEMA} for SQL Developer Web..."
 
 sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 SET SERVEROUTPUT ON
 
 DECLARE
@@ -730,7 +747,7 @@ else
 <comment>Database Connection Pool</comment>
 <entry key="db.hostname">${DB_HOST}</entry>
 <entry key="db.port">${DB_PORT}</entry>
-<entry key="db.servicename">${DB_SERVICE}</entry>
+<entry key="db.servicename">${APEX_PDB}</entry>
 <entry key="db.username">ORDS_PUBLIC_USER</entry>
 <entry key="db.password">${APEX_PASSWORD}</entry>
 <entry key="jdbc.MinLimit">${ORDS_JDBC_MIN_LIMIT}</entry>
@@ -760,6 +777,10 @@ fi
 
 # Always enforce pool sizing — `ords install` seeds a pool.xml without jdbc limits,
 # so ORDS falls back to its default of 10 unless we set these explicitly (idempotent).
+# The service name is enforced too, so a pool.xml left over from an install into a
+# different PDB is repointed at ${APEX_PDB}.
+"${ORDS_HOME}/bin/ords" --config "${ORDS_CONFIG}" config --db-pool default \
+    set db.servicename "${APEX_PDB}"
 "${ORDS_HOME}/bin/ords" --config "${ORDS_CONFIG}" config --db-pool default \
     set jdbc.MinLimit "${ORDS_JDBC_MIN_LIMIT}"
 "${ORDS_HOME}/bin/ords" --config "${ORDS_CONFIG}" config --db-pool default \
@@ -930,7 +951,7 @@ log_info "Final account unlock and password verification (resetting to default p
 # Reset and unlock a standard list of users to the configured APEX_PASSWORD.
 sql sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba <<EOSQL
 SET DEFINE OFF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 BEGIN
     FOR r IN (
         SELECT username FROM dba_users
@@ -1034,9 +1055,9 @@ echo "=================================================================="
 echo " Database Status:"
 echo "=================================================================="
 
-sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL' | sed 's/^  /  \xe2\x9c\x93 /'
+sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL | sed 's/^  /  \xe2\x9c\x93 /'
 SET HEADING OFF FEEDBACK OFF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 
 -- APEX Version
 SELECT '  APEX Version: ' || version || ' (Status: ' || status || ')'
@@ -1062,9 +1083,9 @@ echo "=================================================================="
 echo " ADMIN User Status:"
 echo "=================================================================="
 
-sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << 'EOSQL'
+sql -S sys/\"${SYS_PASSWORD}\"@//${DB_HOST}:${DB_PORT}/${DB_SERVICE} as sysdba << EOSQL
 SET HEADING OFF FEEDBACK OFF
-ALTER SESSION SET CONTAINER=FREEPDB1;
+ALTER SESSION SET CONTAINER=${APEX_PDB};
 BEGIN APEX_UTIL.SET_WORKSPACE('INTERNAL'); END;
 /
 

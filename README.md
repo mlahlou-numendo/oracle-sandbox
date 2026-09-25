@@ -763,9 +763,6 @@ Ask Claude:
 connect to sandbox-ai-conn using the MCP server
 ```
 
-> [!NOTE]
-> The connect tool returns an error message — this is a known upstream SQLcl MCP behaviour. **The connection is established successfully despite the error.** Proceed to run queries normally.
-
 <br>
 
 ### Step 4 — Run a Query
@@ -792,9 +789,12 @@ SANDBOX_AI
 | Tool | Purpose |
 |------|---------|
 | `connect` | Establish database connection (call once per session) |
-| `run-sql` | Execute SQL queries (`SELECT`, `INSERT`, `UPDATE`, etc.) |
-| `run-sqlcl` | Execute SQLcl commands (`DESC`, `SET`, `SHOW`, etc.) |
-| `list-connections` | List available saved connections |
+| `sql_run` | Execute SQL queries (`SELECT`, `INSERT`, `UPDATE`, etc.) |
+| `sqlcl_run` | Execute SQLcl commands (`DESC`, `SET`, `SHOW`, etc.) |
+| `connections_list` | List available saved connections |
+| `disconnect` | Close the current connection |
+| `schema_information` | Describe the objects in the connected schema |
+| `skills_sync` | Install Oracle skills (e.g. APEXlang) from `oracle/skills` |
 
 <br>
 

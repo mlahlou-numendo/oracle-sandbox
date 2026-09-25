@@ -111,6 +111,7 @@ services:
       - SANDBOX_APEX_HOME=${ENV_APEX_HOME}
       - SANDBOX_APEX_IMAGES_DIR=${ENV_APEX_IMAGES_DIR}
       - SANDBOX_APEX_INSTALL_LOG=${ENV_APEX_INSTALL_LOG}
+      - SANDBOX_APEX_PDB=${ENV_APEX_PDB}
       - SANDBOX_APEX_TABLE_SPACE=${ENV_APEX_TABLE_SPACE}
       - SANDBOX_APEX_TABLE_SPACE_FILES=${ENV_APEX_TABLE_SPACE_FILES}
       - SANDBOX_APEX_SECURITY_GROUP_ID=${ENV_APEX_SECURITY_GROUP_ID}
@@ -133,6 +134,8 @@ services:
     volumes:  
       - sandbox_logs_vol:/home/oracle/logs
       - sandbox_dbtools_vol:/home/sandbox/.dbtools
+      # AI assistant skills (SQLcl skills sync). Set ENV_SKILLS_DIR to a host path to bind-mount it.
+      - ${ENV_SKILLS_DIR:-sandbox_skills_vol}:/home/sandbox/.agents/skills
     logging:
       driver: "json-file"
       options:
@@ -229,6 +232,21 @@ volumes:
       com.sandbox.owner: "demasylabs"
       com.sandbox.email: "founder@demasy.io"
       com.sandbox.description: "DBTools configuration and cache"
+      com.sandbox.backup: "false"
+      com.sandbox.data-classification: "internal"
+      com.sandbox.compliance: "development-only"
+      com.sandbox.services: "sandbox-oracle-server"
+      com.sandbox.sensitive-data: "false"
+      com.sandbox.snapshot-frequency: "none"
+      com.sandbox.snapshot-retention: "none"
+  sandbox_skills_vol:
+    driver: local
+    name: sandbox_skills_vol
+    labels:
+      com.sandbox.product: "oracle-sandbox"
+      com.sandbox.owner: "demasylabs"
+      com.sandbox.email: "founder@demasy.io"
+      com.sandbox.description: "AI assistant skills (used when ENV_SKILLS_DIR is unset)"
       com.sandbox.backup: "false"
       com.sandbox.data-classification: "internal"
       com.sandbox.compliance: "development-only"

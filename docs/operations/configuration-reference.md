@@ -48,6 +48,7 @@ All variables are set in `.env` (copy from `.env.example`). Variables are forwar
 | `ENV_APEX_HOME` | `/opt/oracle/apex` | APEX installation directory |
 | `ENV_APEX_IMAGES_DIR` | `/tmp/i` | Static assets directory (~27K files) |
 | `ENV_APEX_INSTALL_LOG` | `/tmp/apex_install.log` | Installation log file |
+| `ENV_APEX_PDB` | `FREEPDB1` | PDB that APEX and ORDS are installed into (`.env.example` sets `SANDBOX_PDB` to match `ENV_DB_MCP_SERVICE`) |
 | `ENV_APEX_TABLE_SPACE` | `SANDBOX_APEX_TS` | APEX metadata tablespace |
 | `ENV_APEX_TABLE_SPACE_FILES` | `SANDBOX_APEX_FILES_TS` | APEX files tablespace |
 | `ENV_APEX_TABLESPACE_SIZE` | `500M` | Initial tablespace size |
@@ -101,6 +102,12 @@ Reservations: 2 CPUs, 4 GB memory.
 
 Reservations: 2 CPUs, 2 GB memory.
 
+### AI Assistant Skills
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENV_SKILLS_DIR` | *(unset: `sandbox_skills_vol`)* | Host folder bind-mounted at `/home/sandbox/.agents/skills`. Must be writable by container UID 10001 (e.g. via `setfacl`) |
+
 <br>
 
 ## Volumes
@@ -110,6 +117,7 @@ Reservations: 2 CPUs, 2 GB memory.
 | `sandbox_oracle_vol` | `/opt/oracle/oradata` | database | Oracle database files |
 | `sandbox_logs_vol` | `/home/oracle/logs` | server | Application and database logs |
 | `sandbox_dbtools_vol` | `/home/sandbox/.dbtools` | server | SQLcl saved connections |
+| `sandbox_skills_vol` | `/home/sandbox/.agents/skills` | server | AI assistant skills (replaced by a bind mount when `ENV_SKILLS_DIR` is set) |
 
 <br>
 
