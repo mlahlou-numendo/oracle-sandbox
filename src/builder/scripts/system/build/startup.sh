@@ -273,6 +273,19 @@ if [[ -n "$SANDBOX_DB_HOST" && -n "$SANDBOX_DB_PORT" && -n "$SANDBOX_DB_SERVICE"
             && echo "[$(date '+%Y-%m-%d %H:%M:%S')] [OK] MCP saved connection ready" >> "$AUTO_USER_LOG" \
             || echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] MCP saved connection setup failed" >> "$AUTO_USER_LOG"
 
+        # ─── Map MCP schema to APEX workspace (if APEX is installed) ──────────────
+        # install-apex also maps it (Step 5E); whichever of the two finishes last
+        # finds both APEX and the MCP user in place. Exit 2 means not ready yet.
+        if [ "$INSTALL_APEX" = "true" ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Mapping MCP schema to APEX workspace..." >> "$AUTO_USER_LOG"
+            bash /usr/sandbox/app/oracle/apex/map-mcp-schema.sh >> "$AUTO_USER_LOG" 2>&1
+            case $? in
+                0) echo "[$(date '+%Y-%m-%d %H:%M:%S')] [OK] MCP schema mapped to APEX workspace" >> "$AUTO_USER_LOG" ;;
+                2) echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SKIP] MCP schema mapping deferred to install-apex" >> "$AUTO_USER_LOG" ;;
+                *) echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] MCP schema mapping failed" >> "$AUTO_USER_LOG" ;;
+            esac
+        fi
+
         echo "" >> "$AUTO_USER_LOG"
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Auto-user setup complete" >> "$AUTO_USER_LOG"
     ) &

@@ -796,6 +796,9 @@ SANDBOX_AI
 | `schema_information` | Describe the objects in the connected schema |
 | `skills_sync` | Install Oracle skills (e.g. APEXlang) from `oracle/skills` |
 
+> [!NOTE]
+> When APEX is installed, the MCP user's schema is automatically mapped to the default APEX workspace (`ENV_APEX_DEFAULT_WORKSPACE`), so SQLcl's APEX commands work through `sqlcl_run`. This requires `ENV_APEX_PDB` to match `ENV_DB_MCP_SERVICE`. To re-run the mapping manually: `/usr/sandbox/app/oracle/apex/map-mcp-schema.sh`
+
 <br>
 
 ### MCP Connection Details

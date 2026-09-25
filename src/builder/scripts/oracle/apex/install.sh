@@ -544,6 +544,23 @@ else
 fi
 
 ################################################################################
+# STEP 5E: Map MCP schema to the workspace
+################################################################################
+# Lets SQLcl's APEX commands run over the MCP connection. On startup the MCP
+# user may not be provisioned yet (exit 2); startup.sh retries the mapping once
+# user provisioning is done, so a skip here is not an error.
+log_info "Step 5E: Mapping MCP schema to workspace ${WORKSPACE_NAME}..."
+
+MAP_EXIT=0
+"${SCRIPT_DIR}/map-mcp-schema.sh" || MAP_EXIT=$?
+
+case "${MAP_EXIT}" in
+    0) log_success "MCP schema mapped to workspace ${WORKSPACE_NAME}" ;;
+    2) log_warn "MCP schema mapping skipped (see above)" ;;
+    *) log_warn "MCP schema mapping failed — rerun: ${SCRIPT_DIR}/map-mcp-schema.sh" ;;
+esac
+
+################################################################################
 # STEP 6: Configure APEX REST
 ################################################################################
 log_info "Step 6: Configuring APEX REST..."
